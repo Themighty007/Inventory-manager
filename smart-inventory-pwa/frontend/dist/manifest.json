@@ -1,0 +1,55 @@
+{
+  "name": "Smart Electronics Inventory",
+  "short_name": "Inventory",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#121316",
+  "theme_color": "#121316",
+  "description": "Smart Electronics Inventory Management System for Stanley 1-93-981 39-Compartment Cabinet",
+  "categories": ["productivity", "utilities", "business"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scan Barcode",
+      "url": "/?view=scanner",
+      "description": "Open camera barcode scanner"
+    },
+    {
+      "name": "Stanley Cabinet",
+      "url": "/?view=cabinet",
+      "description": "View 39 storage compartments"
+    },
+    {
+      "name": "Sync Queue",
+      "url": "/?view=queue",
+      "description": "View pending offline synchronizations"
+    }
+  ]
+}

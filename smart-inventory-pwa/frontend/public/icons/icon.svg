@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="100" fill="#121316"/>
+  <rect x="24" y="24" width="464" height="464" rx="80" fill="#1C1D22" stroke="#FEF08A" stroke-width="8"/>
+  
+  <!-- Stanley 39 Cabinet Matrix Indicator Grid -->
+  <g fill="#27272A" stroke="#3F3F46" stroke-width="3">
+    <rect x="60" y="60" width="70" height="50" rx="8" fill="#FEF08A"/>
+    <rect x="140" y="60" width="70" height="50" rx="8"/>
+    <rect x="220" y="60" width="70" height="50" rx="8" fill="#86EFAC"/>
+    <rect x="300" y="60" width="70" height="50" rx="8"/>
+    <rect x="380" y="60" width="70" height="50" rx="8" fill="#FCA5A5"/>
+  </g>
+
+  <!-- Central Chip Symbol -->
+  <rect x="156" y="156" width="200" height="200" rx="36" fill="#FEF08A" stroke="#18181B" stroke-width="12"/>
+  <rect x="196" y="196" width="120" height="120" rx="20" fill="#18181B"/>
+  
+  <!-- Microcontroller Pin Tracks -->
+  <path d="M120 206 h36 M120 256 h36 M120 306 h36" stroke="#FEF08A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M356 206 h36 M356 256 h36 M356 306 h36" stroke="#FEF08A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M206 120 v36 M256 120 v36 M306 120 v36" stroke="#FEF08A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M206 356 v36 M256 356 v36 M306 356 v36" stroke="#FEF08A" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Core Core Glow / Indicator -->
+  <circle cx="256" cy="256" r="28" fill="#86EFAC"/>
+  <circle cx="256" cy="256" r="14" fill="#064E3B"/>
+
+  <!-- Typography Label -->
+  <text x="256" y="440" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="4">STANLEY 39</text>
+  <text x="256" y="474" font-family="monospace" font-size="20" font-weight="700" fill="#86EFAC" text-anchor="middle">INVENTORY PWA</text>
+</svg>
