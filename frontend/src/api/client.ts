@@ -144,6 +144,12 @@ export async function fetchDrawerLabels(): Promise<DrawerLabelQr[]> {
   return res.json();
 }
 
+export async function fetchQrCode(code: string): Promise<{ code: string; data_uri: string }> {
+  const res = await fetch(`${BASE_URL}/api/qr/code?code=${encodeURIComponent(code)}`);
+  if (!res.ok) throw new Error('Failed to fetch QR code');
+  return res.json();
+}
+
 export async function syncBatchOperations(operations: any[]): Promise<SyncBatchResult> {
   const res = await fetch(`${BASE_URL}/api/sync/batch`, {
     method: 'POST',

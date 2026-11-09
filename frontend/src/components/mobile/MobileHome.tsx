@@ -44,8 +44,21 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
 
   const handleScanCompleted = (code: string) => {
     setScannedCode(code);
+
+    // Check if the scanned code is a Drawer identifier (e.g. "DRAWER:S01", "DRAWER:L03", "S01", "L05")
+    const drawerMatch = code.match(/^(?:DRAWER:)?([SL]\d{2})$/i);
+    if (drawerMatch) {
+      const drawerId = drawerMatch[1].toUpperCase();
+      if (drawers.some((d) => d.id === drawerId)) {
+        setScannedCode(`DRAWER:${drawerId}`);
+        setActiveTab('INTAKE');
+        onNotice(`Compartment ${drawerId} recognized! Assigning item to ${drawerId}.`);
+        return;
+      }
+    }
+
     setActiveTab('INTAKE');
-    onNotice(`Code detected: ${code}. Confirming intake registration.`);
+    onNotice(`Code detected: ${code}`);
   };
 
   const handleIntakeCompleted = (msg: string) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DrawerDetail } from '../../types/inventory';
-import { fetchDrawerDetail, consumeStock, transferStock } from '../../api/client';
+import { fetchDrawerDetail, consumeStock, transferStock, fetchQrCode } from '../../api/client';
 import { X, Plus, Minus, ArrowRightLeft, QrCode, ShieldCheck, AlertCircle } from 'lucide-react';
 
 interface DrawerModalProps {
@@ -37,12 +37,22 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
   // Status/Error
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [qrDataUri, setQrDataUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (drawerId) {
       loadDrawer(drawerId);
+      setQrDataUri(null);
     }
   }, [drawerId]);
+
+  useEffect(() => {
+    if (drawerId && activeTab === 'QR' && !qrDataUri) {
+      fetchQrCode(`DRAWER:${drawerId}`)
+        .then((res) => setQrDataUri(res.data_uri))
+        .catch((err) => console.warn('Failed to load QR:', err));
+    }
+  }, [drawerId, activeTab, qrDataUri]);
 
   const loadDrawer = async (id: string) => {
     try {
@@ -386,17 +396,27 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
         {activeTab === 'QR' && (
           <div className="flex flex-col items-center justify-center p-6 space-y-4 text-center">
             <div className="p-4 bg-white border-4 border-[#18181B] rounded-2xl shadow-[4px_4px_0px_#18181B]">
-              <div className="w-48 h-48 flex items-center justify-center bg-[#FAF9F5] border-2 border-dashed border-[#18181B] rounded-xl p-3">
-                <QrCode className="w-full h-full text-[#18181B]" />
+              <div className="w-52 h-52 flex items-center justify-center bg-white border-2 border-[#18181B] rounded-xl p-2">
+                {qrDataUri ? (
+                  <img
+                    src={qrDataUri}
+                    alt={`Scannable QR for Compartment ${drawerId}`}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="text-xs font-mono font-bold text-[#71717A] animate-pulse">
+                    Generating live QR code...
+                  </div>
+                )}
               </div>
             </div>
 
             <div>
-              <div className="font-mono font-black text-base text-[#18181B]">
+              <div className="font-mono font-black text-lg text-[#18181B] tracking-wide">
                 DRAWER:{drawerId}
               </div>
               <div className="text-xs text-[#71717A] font-semibold mt-0.5">
-                Stanley 1-93-981 Compartment QR Code
+                Scan with phone camera to open or stock this compartment
               </div>
             </div>
 

@@ -4,7 +4,7 @@ import {
   ItemResponse,
   TransactionResponse,
 } from '../../types/inventory';
-import { clearDemoData, resetDemoData } from '../../api/client';
+import { clearDemoData, resetDemoData, fetchQrCode } from '../../api/client';
 import { StanleyCabinetVisualizer } from '../cabinet/StanleyCabinetVisualizer';
 import { DrawerModal } from '../cabinet/DrawerModal';
 import { InventoryTable } from '../inventory/InventoryTable';
@@ -68,8 +68,21 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
   const [intakeDrawer, setIntakeDrawer] = useState<string>('S01');
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+  const [mobileQrUri, setMobileQrUri] = useState<string | null>(null);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [tempName, setTempName] = useState(userName);
+
+  const lanIp = '192.168.29.243';
+  const mobileHttpsUrl = `https://${lanIp}:8443`;
+  const mobileHttpUrl = `http://${lanIp}:8000`;
+
+  React.useEffect(() => {
+    if (isMobileModalOpen && !mobileQrUri) {
+      fetchQrCode(mobileHttpsUrl)
+        .then((res) => setMobileQrUri(res.data_uri))
+        .catch((err) => console.warn('Failed to load mobile QR:', err));
+    }
+  }, [isMobileModalOpen, mobileQrUri, mobileHttpsUrl]);
 
   const handleClearDemo = async () => {
     if (
@@ -116,10 +129,6 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
   const totalOccupied = drawers.filter((d) => d.is_occupied).length;
   const totalAvailable = 39 - totalOccupied;
   const totalUnits = drawers.reduce((sum, d) => sum + d.total_units, 0);
-
-  const lanIp = '192.168.29.243';
-  const mobileHttpsUrl = `https://${lanIp}:8443`;
-  const mobileHttpUrl = `http://${lanIp}:8000`;
 
   return (
     <div className="app-layout">
@@ -467,6 +476,29 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
             </div>
 
             <div className="space-y-4">
+              {/* Live QR Code Box */}
+              <div className="p-4 bg-white border-2 border-[#18181B] rounded-xl shadow-[2px_2px_0px_#18181B] flex flex-col items-center justify-center text-center">
+                <div className="w-44 h-44 p-2 bg-[#FAF9F5] border-2 border-[#18181B] rounded-xl flex items-center justify-center mb-2 shadow-inner">
+                  {mobileQrUri ? (
+                    <img
+                      src={mobileQrUri}
+                      alt="Scan to open on Mobile"
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="text-xs font-mono font-bold text-[#71717A] animate-pulse">
+                      Generating QR...
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs font-black text-[#18181B]">
+                  Point phone camera at this QR code
+                </div>
+                <div className="text-[10px] text-[#71717A] font-semibold">
+                  Instantly opens the Mobile PWA in your browser
+                </div>
+              </div>
+
               <div className="p-4 rounded-xl border-2 border-[#18181B] bg-[#DCFCE7] shadow-[2px_2px_0px_#18181B]">
                 <div className="text-xs font-black uppercase text-[#15803D] mb-1">
                   1. Secure HTTPS Link (Camera & PWA Enabled)

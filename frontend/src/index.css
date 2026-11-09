@@ -276,3 +276,29 @@ body {
 .drawer-status-gray {
   border-left: 4px solid #52525B !important;
 }
+
+/* Scanner & QR Reader Elements */
+#qr-reader {
+  width: 100% !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 52vh !important;
+  object-fit: cover !important;
+  border-radius: 14px !important;
+}
+
+#qr-reader__scan_region {
+  background: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#qr-reader__dashboard {
+  padding: 4px !important;
+}
