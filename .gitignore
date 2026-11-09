@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# SQLite WAL and temp files
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Frontend / Node
+node_modules/
+frontend/node_modules/
+.npm
+*.log
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
