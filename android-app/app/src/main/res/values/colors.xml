@@ -1,0 +1,11 @@
+<resources>
+    <color name="canvas_cream">#F8F6F1</color>
+    <color name="obsidian">#121316</color>
+    <color name="mint_green">#86EFAC</color>
+    <color name="pastel_yellow">#FEF08A</color>
+    <color name="salmon_coral">#FCA5A5</color>
+    <color name="lavender_purple">#DDD6FE</color>
+    <color name="sky_blue">#93C5FD</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+</resources>

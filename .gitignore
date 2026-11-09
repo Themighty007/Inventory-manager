@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+frontend/node_modules/
+.pytest_cache/
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+data/*.db-wal
+data/*.db-shm
+.DS_Store
+Thumbs.db
