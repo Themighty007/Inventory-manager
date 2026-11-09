@@ -45,28 +45,68 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
 
   useEffect(() => {
     if (!initialCode) return;
-    const clean = initialCode.trim();
+    const raw = initialCode.trim();
 
-    // 1. Drawer QR Code, e.g. "DRAWER:S04" or plain "S04"
-    const drawerMatch = clean.match(/^(?:DRAWER:)?([SL]\d{2})$/i);
-    if (drawerMatch) {
-      const parsedDrawer = drawerMatch[1].toUpperCase();
-      if (drawers.some((d) => d.id === parsedDrawer)) {
-        setDrawerId(parsedDrawer);
+    // 1. Check if JSON payload (e.g. smart QR label or DigiKey/Mouser app payload)
+    if (raw.startsWith('{') && raw.endsWith('}')) {
+      try {
+        const obj = JSON.parse(raw);
+        if (obj.sku || obj.item_sku || obj.partNumber) {
+          setSku(String(obj.sku || obj.item_sku || obj.partNumber).toUpperCase());
+        }
+        if (obj.name || obj.item_name || obj.description) {
+          setName(String(obj.name || obj.item_name || obj.description));
+        }
+        if (obj.quantity || obj.qty) {
+          setQuantity(Number(obj.quantity || obj.qty) || 1);
+        }
+        if (obj.price || obj.unit_price) {
+          setUnitPrice(Number(obj.price || obj.unit_price) || '');
+        }
+        if (obj.supplier || obj.vendor) {
+          setSupplier(String(obj.supplier || obj.vendor));
+        }
+        if (obj.invoice || obj.invoice_number) {
+          setInvoice(String(obj.invoice || obj.invoice_number));
+        }
+        if (obj.category) {
+          setCategory(String(obj.category));
+        }
+        if (obj.drawer || obj.drawer_id) {
+          const dId = String(obj.drawer || obj.drawer_id).toUpperCase();
+          if (drawers.some((d) => d.id === dId)) {
+            setDrawerId(dId);
+          }
+        }
         return;
+      } catch {
+        // Not valid JSON, continue with pattern matching
       }
     }
 
-    // 2. SKU / Item QR Code, e.g. "ITEM:ESP32" or "SKU:RES-10K"
-    if (clean.startsWith('ITEM:') || clean.startsWith('SKU:')) {
-      const parsedSku = clean.replace(/^(ITEM:|SKU:)/, '').trim().toUpperCase();
+    // 2. Direct Drawer Code or Drawer in URL: "DRAWER:S04", "S04", "https://...?drawer=S04", "drawer/S04"
+    const urlDrawerMatch = raw.match(/(?:drawer[=\/:]|#|\b)([SL]\d{2})\b/i);
+    if (urlDrawerMatch) {
+      const candidate = urlDrawerMatch[1].toUpperCase();
+      if (drawers.some((d) => d.id === candidate)) {
+        setDrawerId(candidate);
+        // If the code was ONLY the drawer (e.g. "DRAWER:S04" or "S04"), return now
+        if (raw.match(/^(?:DRAWER:)?([SL]\d{2})$/i)) {
+          return;
+        }
+      }
+    }
+
+    // 3. SKU / Item Prefix, e.g. "ITEM:ESP32" or "SKU:RES-10K"
+    if (/^(?:ITEM|SKU):/i.test(raw)) {
+      const parsedSku = raw.replace(/^(?:ITEM|SKU):/i, '').trim().toUpperCase();
       setSku(parsedSku);
       return;
     }
 
-    // 3. Tracking code or raw barcode
-    setTrackingCode(clean);
-    setSku(clean.toUpperCase());
+    // 4. Tracking code or raw barcode
+    setTrackingCode(raw);
+    setSku(raw.toUpperCase());
   }, [initialCode, drawers]);
 
   const handleSubmit = async (e: React.FormEvent) => {

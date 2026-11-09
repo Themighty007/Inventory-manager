@@ -563,15 +563,15 @@ class InventoryService:
     def generate_qr_svg(code: str) -> str:
         factory = qrcode.image.svg.SvgPathImage
         qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_Q,
             box_size=10,
-            border=2,
+            border=4,
             image_factory=factory,
         )
         qr.add_data(code)
         qr.make(fit=True)
-        img = qr.make_image(fill_color="#18181B", back_color="#FFFFFF")
+        img = qr.make_image(fill_color="#000000", back_color="#FFFFFF")
 
         stream = io.BytesIO()
         img.save(stream)
