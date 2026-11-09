@@ -26,8 +26,24 @@ public class MainActivity extends Activity {
 
     private WebView webView;
     private ProgressBar progressBar;
-    private static final String DEFAULT_HOST = "http://192.168.29.243:8000/mobile";
     private static final int PERMISSION_REQ_CODE = 101;
+
+    private static String getDefaultHost() {
+        if (Build.FINGERPRINT.startsWith("generic")
+                || Build.FINGERPRINT.startsWith("unknown")
+                || Build.MODEL.contains("google_sdk")
+                || Build.MODEL.contains("Emulator")
+                || Build.MODEL.contains("Android SDK built for x86")
+                || Build.MANUFACTURER.contains("Genymotion")
+                || Build.HARDWARE.contains("goldfish")
+                || Build.HARDWARE.contains("ranchu")
+                || Build.PRODUCT.contains("sdk")
+                || Build.PRODUCT.contains("google_sdk")
+                || Build.PRODUCT.contains("emulator")) {
+            return "http://10.0.2.2:8000/mobile";
+        }
+        return "http://192.168.29.243:8000/mobile";
+    }
 
     @Override
     @SuppressLint("SetJavaScriptEnabled")
@@ -48,7 +64,8 @@ public class MainActivity extends Activity {
         }
 
         SharedPreferences prefs = getSharedPreferences("inventory_prefs", Context.MODE_PRIVATE);
-        String serverUrl = prefs.getString("server_url", DEFAULT_HOST);
+        String defaultHost = getDefaultHost();
+        String serverUrl = prefs.getString("server_url", defaultHost);
 
         setupWebView();
         webView.loadUrl(serverUrl);
@@ -122,7 +139,7 @@ public class MainActivity extends Activity {
 
     private void showConfigDialog(String promptMessage) {
         final SharedPreferences prefs = getSharedPreferences("inventory_prefs", Context.MODE_PRIVATE);
-        String currentUrl = prefs.getString("server_url", DEFAULT_HOST);
+        String currentUrl = prefs.getString("server_url", getDefaultHost());
 
         final EditText input = new EditText(this);
         input.setText(currentUrl);

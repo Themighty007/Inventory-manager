@@ -34,7 +34,7 @@ Write-Host "1. Compiling resources with aapt2..."
 & $aapt2 compile --dir $appRes -o "$buildDir\compiled_res.zip"
 
 Write-Host "2. Linking resources and generating R.java..."
-& $aapt2 link -I $androidJar --manifest $manifest "$buildDir\compiled_res.zip" --java "$buildDir\gen" -o "$buildDir\linked.apk" --auto-add-overlay
+& $aapt2 link -I $androidJar --min-sdk-version 24 --target-sdk-version 34 --manifest $manifest "$buildDir\compiled_res.zip" --java "$buildDir\gen" -o "$buildDir\linked.apk" --auto-add-overlay
 
 Write-Host "3. Compiling Java classes with javac..."
 $rJava = Get-ChildItem -Path "$buildDir\gen" -Filter "R.java" -Recurse | Select-Object -ExpandProperty FullName
