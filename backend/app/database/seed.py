@@ -204,6 +204,8 @@ def seed_database():
             ])
 
             db.commit()
-
+    except Exception as e:
+        db.rollback()
+        # Concurrency safe: if already seeded by sibling thread, ignore
     finally:
         db.close()
