@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
 import { ItemResponse } from '../types/inventory';
-import { Search, Plus, Minus, ArrowRightLeft, ExternalLink, AlertCircle } from 'lucide-react';
+import { Search, Plus, Minus, ArrowRightLeft, Package } from 'lucide-react';
 
 interface InventoryTableProps {
   items: ItemResponse[];
   onOpenReceiveModal: (defaultSku?: string) => void;
-  onOpenConsumeModal: (sku: string, drawerId: string) => void;
-  onOpenTransferModal: (sku: string, fromDrawerId: string) => void;
+  onOpenDrawerModal: (drawerId: string) => void;
 }
 
 export const InventoryTable: React.FC<InventoryTableProps> = ({
   items,
   onOpenReceiveModal,
-  onOpenConsumeModal,
-  onOpenTransferModal,
+  onOpenDrawerModal,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -32,16 +30,21 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
   });
 
   return (
-    <div className="brutal-card p-6 bg-white">
+    <div className="brutal-card p-6 bg-white mb-8">
       {/* Table Header & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-3 border-b-2 border-[#18181B]">
         <div className="flex items-center gap-3">
-          <h3 className="text-base font-black tracking-tight text-[#18181B] uppercase">
-            CENTRAL ENGINEERING STORES INVENTORY
-          </h3>
-          <span className="brutal-pill pill-dark text-xs">
-            ALL LOGGED
-          </span>
+          <div className="w-9 h-9 rounded-xl bg-[#86EFAC] border-2 border-[#18181B] flex items-center justify-center font-bold">
+            <Package className="w-5 h-5 text-[#064E3B]" />
+          </div>
+          <div>
+            <h3 className="text-base font-black tracking-tight text-[#18181B] uppercase">
+              Inventory List
+            </h3>
+            <p className="text-xs text-[#71717A] font-semibold">
+              All registered electronic components and physical drawer locations
+            </p>
+          </div>
         </div>
 
         {/* Search & Actions */}
@@ -50,18 +53,18 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
             <Search className="w-4 h-4 text-[#71717A] absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Search SKUs, descriptions..."
+              placeholder="Search components or SKUs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-3 py-1.5 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] focus:outline-none focus:bg-white w-56"
+              className="pl-9 pr-3 py-1.5 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] focus:outline-none focus:bg-white w-64"
             />
           </div>
 
           <button
             onClick={() => onOpenReceiveModal()}
-            className="brutal-btn brutal-btn-yellow text-xs py-1.5 px-3"
+            className="brutal-btn brutal-btn-mint text-xs py-1.5 px-3"
           >
-            <Plus className="w-3.5 h-3.5" /> Add / Receive SKU
+            <Plus className="w-3.5 h-3.5" /> + Add / Receive Item
           </button>
         </div>
       </div>
@@ -84,117 +87,106 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
       </div>
 
       {/* Table Container */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto border-2 border-[#18181B] rounded-xl">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="border-b-2 border-[#18181B] text-[#52525B] font-black tracking-wider uppercase text-[11px]">
-              <th className="py-2.5 px-3">SKU</th>
-              <th className="py-2.5 px-3">ITEM DESCRIPTION</th>
-              <th className="py-2.5 px-3 text-center">LOCATIONS</th>
-              <th className="py-2.5 px-3 text-right">AVAILABLE</th>
-              <th className="py-2.5 px-3 text-right">RESERVED</th>
-              <th className="py-2.5 px-3 text-right">UNIT COST</th>
-              <th className="py-2.5 px-3 text-center">ACTIONS</th>
+            <tr className="bg-[#FAF9F5] border-b-2 border-[#18181B] text-[#18181B] font-black tracking-wider uppercase text-[11px]">
+              <th className="py-3 px-4 min-w-[140px]">SKU</th>
+              <th className="py-3 px-4">ITEM DESCRIPTION</th>
+              <th className="py-3 px-4 min-w-[120px] text-center">LOCATIONS</th>
+              <th className="py-3 px-4 min-w-[100px] text-right">AVAILABLE</th>
+              <th className="py-3 px-4 min-w-[100px] text-right">UNIT COST</th>
+              <th className="py-3 px-4 min-w-[120px] text-center">ACTIONS</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#E4E4E7]">
-            {filteredItems.map((item) => (
-              <tr key={item.id} className="hover:bg-[#FBF9F5] transition-colors">
-                {/* SKU */}
-                <td className="py-3 px-3">
-                  <div className="font-mono font-bold text-xs text-[#18181B] flex items-center gap-1.5">
-                    {item.sku}
-                    {item.is_low_stock && (
-                      <span title="Low Stock Threshold Reached">
-                        <AlertCircle className="w-3.5 h-3.5 text-[#B91C1C]" />
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-[#71717A] uppercase font-semibold">
-                    {item.category}
-                  </span>
-                </td>
-
-                {/* Description */}
-                <td className="py-3 px-3">
-                  <div className="font-semibold text-xs text-[#18181B] max-w-sm truncate">
-                    {item.name}
-                  </div>
-                  {item.description && (
-                    <div className="text-[11px] text-[#71717A] truncate max-w-sm">
-                      {item.description}
+          <tbody className="divide-y-2 divide-[#18181B] bg-white">
+            {filteredItems.length > 0 ? (
+              filteredItems.map((item) => (
+                <tr key={item.id} className="hover:bg-[#FBF9F5] transition-colors">
+                  {/* SKU */}
+                  <td className="py-3 px-4">
+                    <div className="font-mono font-bold text-xs text-[#18181B]">
+                      {item.sku}
                     </div>
-                  )}
-                </td>
+                    <span className="text-[10px] text-[#71717A] uppercase font-semibold">
+                      {item.category}
+                    </span>
+                  </td>
 
-                {/* Locations / Drawers */}
-                <td className="py-3 px-3 text-center">
-                  <div className="flex items-center justify-center gap-1 flex-wrap">
-                    {item.locations.length > 0 ? (
-                      item.locations.map((loc) => (
-                        <span
-                          key={loc.drawer_id}
-                          className="font-mono px-2 py-0.5 rounded border border-[#18181B] bg-[#FEF08A] font-bold text-[10px]"
-                          title={`${loc.quantity} ${item.unit} stored in ${loc.drawer_id}`}
-                        >
-                          {loc.drawer_id} ({loc.quantity})
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-[#A1A1AA] italic text-[11px]">Unassigned</span>
+                  {/* Description */}
+                  <td className="py-3 px-4">
+                    <div className="font-semibold text-xs text-[#18181B]">
+                      {item.name}
+                    </div>
+                    {item.description && (
+                      <div className="text-[11px] text-[#71717A]">
+                        {item.description}
+                      </div>
                     )}
-                  </div>
-                </td>
+                  </td>
 
-                {/* Available */}
-                <td className="py-3 px-3 text-right font-mono font-black text-xs text-[#18181B]">
-                  <span className={`px-2 py-0.5 rounded ${item.total_available <= item.min_stock_threshold ? 'bg-[#FEE2E2] text-[#991B1B]' : 'bg-[#DCFCE7] text-[#166534]'}`}>
-                    {item.total_available}
-                  </span>
-                </td>
+                  {/* Locations / Drawers */}
+                  <td className="py-3 px-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      {item.locations.length > 0 ? (
+                        item.locations.map((loc) => (
+                          <button
+                            key={loc.drawer_id}
+                            onClick={() => onOpenDrawerModal(loc.drawer_id)}
+                            className="font-mono px-2 py-0.5 rounded border border-[#18181B] bg-[#FEF08A] hover:bg-[#FDE047] font-bold text-[10px] cursor-pointer"
+                            title={`Click to open Drawer ${loc.drawer_id}`}
+                          >
+                            {loc.drawer_id} ({loc.quantity})
+                          </button>
+                        ))
+                      ) : (
+                        <span className="text-[#A1A1AA] italic text-[11px]">Unassigned</span>
+                      )}
+                    </div>
+                  </td>
 
-                {/* Reserved */}
-                <td className="py-3 px-3 text-right font-mono font-bold text-xs text-[#71717A]">
-                  {item.total_reserved}
-                </td>
+                  {/* Available */}
+                  <td className="py-3 px-4 text-right font-mono font-black text-xs text-[#18181B]">
+                    <span className="px-2.5 py-1 rounded bg-[#DCFCE7] text-[#166534] border border-[#86EFAC] inline-block">
+                      {item.total_available} {item.unit}
+                    </span>
+                  </td>
 
-                {/* Unit Cost */}
-                <td className="py-3 px-3 text-right font-mono font-bold text-xs text-[#18181B]">
-                  ₹{item.unit_cost.toLocaleString('en-IN')}
-                </td>
+                  {/* Unit Cost */}
+                  <td className="py-3 px-4 text-right font-mono font-bold text-xs text-[#18181B]">
+                    ₹{item.unit_cost.toLocaleString('en-IN')}
+                  </td>
 
-                {/* Quick Actions */}
-                <td className="py-3 px-3 text-center">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <button
-                      onClick={() => onOpenReceiveModal(item.sku)}
-                      className="p-1 rounded bg-[#86EFAC] border border-[#18181B] hover:bg-[#6EE7B7] transition-all"
-                      title="Receive More Stock"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-[#064E3B]" />
-                    </button>
-                    {item.locations.length > 0 && (
-                      <>
+                  {/* Quick Actions */}
+                  <td className="py-3 px-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => onOpenReceiveModal(item.sku)}
+                        className="p-1.5 rounded bg-[#86EFAC] border border-[#18181B] hover:bg-[#6EE7B7] text-[#064E3B] transition-all"
+                        title="Add Stock"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                      {item.locations.length > 0 && (
                         <button
-                          onClick={() => onOpenConsumeModal(item.sku, item.locations[0].drawer_id)}
-                          className="p-1 rounded bg-[#FCA5A5] border border-[#18181B] hover:bg-[#F87171] transition-all"
-                          title="Consume / Deduct Stock"
+                          onClick={() => onOpenDrawerModal(item.locations[0].drawer_id)}
+                          className="px-2 py-1 rounded bg-[#FEF08A] border border-[#18181B] hover:bg-[#FDE047] text-[#18181B] text-[11px] font-bold transition-all"
+                          title="Manage in Drawer"
                         >
-                          <Minus className="w-3.5 h-3.5 text-[#7F1D1D]" />
+                          View / Remove
                         </button>
-                        <button
-                          onClick={() => onOpenTransferModal(item.sku, item.locations[0].drawer_id)}
-                          className="p-1 rounded bg-[#93C5FD] border border-[#18181B] hover:bg-[#60A5FA] transition-all"
-                          title="Transfer to Another Drawer"
-                        >
-                          <ArrowRightLeft className="w-3.5 h-3.5 text-[#1E3A8A]" />
-                        </button>
-                      </>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-xs text-[#71717A] font-semibold">
+                  No components in inventory. Click "+ Add / Receive Item" to add your first part.
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

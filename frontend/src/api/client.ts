@@ -131,3 +131,16 @@ export async function searchGlobal(q: string) {
   if (!res.ok) throw new Error('Failed to execute search');
   return res.json();
 }
+
+export async function clearDemoData() {
+  const res = await fetch(`${BASE_URL}/api/admin/clear-demo-data`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to clear demo data');
+  return res.json();
+}
+
+export async function resetDemoData() {
+  const res = await fetch(`${BASE_URL}/api/admin/reset-demo-data`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to reset demo data');
+  return res.json();
+}
+

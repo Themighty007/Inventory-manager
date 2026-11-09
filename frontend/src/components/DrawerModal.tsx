@@ -1,30 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { DrawerDetail } from '../types/inventory';
 import { fetchDrawerDetail, consumeStock, transferStock } from '../api/client';
-import { X, Plus, Minus, ArrowRightLeft, QrCode, Box, ShieldCheck, AlertCircle } from 'lucide-react';
+import { X, Plus, Minus, ArrowRightLeft, QrCode, Box, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface DrawerModalProps {
   drawerId: string | null;
+  userName: string;
   onClose: () => void;
   onRefresh: () => void;
   onOpenReceiveForDrawer: (drawerId: string) => void;
+  onPrintQrForDrawer: (drawerId: string) => void;
 }
 
 export const DrawerModal: React.FC<DrawerModalProps> = ({
   drawerId,
+  userName,
   onClose,
   onRefresh,
   onOpenReceiveForDrawer,
+  onPrintQrForDrawer,
 }) => {
   const [detail, setDetail] = useState<DrawerDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'ITEMS' | 'CONSUME' | 'TRANSFER' | 'QR'>('ITEMS');
+  const [activeTab, setActiveTab] = useState<'CONTENTS' | 'REMOVE' | 'TRANSFER' | 'QR'>('CONTENTS');
 
-  // Consume state
-  const [consumeSku, setConsumeSku] = useState('');
-  const [consumeQty, setConsumeQty] = useState(1);
-  const [requester, setRequester] = useState('');
-  const [project, setProject] = useState('');
+  // Quick Remove state
+  const [removeSku, setRemoveSku] = useState('');
+  const [removeQty, setRemoveQty] = useState(1);
+  const [reason, setReason] = useState('');
 
   // Transfer state
   const [transferSku, setTransferSku] = useState('');
@@ -49,7 +52,7 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
       const res = await fetchDrawerDetail(id);
       setDetail(res);
       if (res.items.length > 0) {
-        setConsumeSku(res.items[0].sku);
+        setRemoveSku(res.items[0].sku);
         setTransferSku(res.items[0].sku);
       }
     } catch (err: any) {
@@ -59,21 +62,22 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
     }
   };
 
-  const handleConsume = async (e: React.FormEvent) => {
+  const handleRemoveStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!drawerId || !consumeSku) return;
+    if (!drawerId || !removeSku) return;
     try {
       setActionError(null);
       const res = await consumeStock({
         drawer_id: drawerId,
-        sku: consumeSku,
-        quantity: consumeQty,
-        requester: requester || 'Lab Technician',
-        project_name: project || 'General Maintenance',
+        sku: removeSku,
+        quantity: removeQty,
+        requester: userName || 'User',
+        project_name: reason || 'Part Consumed / Used',
       });
       setActionSuccess(res.message);
       loadDrawer(drawerId);
       onRefresh();
+      setTimeout(() => setActiveTab('CONTENTS'), 1200);
     } catch (err: any) {
       setActionError(err.message);
     }
@@ -93,6 +97,7 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
       setActionSuccess(res.message);
       loadDrawer(drawerId);
       onRefresh();
+      setTimeout(() => setActiveTab('CONTENTS'), 1200);
     } catch (err: any) {
       setActionError(err.message);
     }
@@ -103,14 +108,14 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="brutal-card bg-white w-full max-w-xl p-6 relative max-h-[90vh] overflow-y-auto"
+        className="brutal-card bg-white w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b-2 border-[#18181B] mb-5">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-[#18181B] text-white flex flex-col items-center justify-center font-mono font-black border-2 border-[#18181B] shadow-[2px_2px_0px_#18181B]">
-              <span className="text-sm">{drawerId}</span>
+              <span className="text-base">{drawerId}</span>
               <span className="text-[9px] text-[#A1A1AA] uppercase">
                 {detail?.drawer_type === 'SMALL' ? 'Small' : 'Large'}
               </span>
@@ -118,8 +123,8 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-black text-[#18181B]">Compartment {drawerId}</h2>
-                <span className={`brutal-pill pill-${detail?.status_color || 'yellow'}`}>
-                  {detail?.is_occupied ? `${detail.total_units} Units` : 'Empty'}
+                <span className={`brutal-pill ${detail?.is_occupied ? 'pill-mint' : 'pill-yellow'}`}>
+                  {detail?.is_occupied ? 'Available' : 'Empty'}
                 </span>
               </div>
               <p className="text-xs text-[#71717A] font-mono mt-0.5">
@@ -128,17 +133,26 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg border-2 border-[#18181B] flex items-center justify-center hover:bg-[#F4F4F5] transition-all"
-          >
-            <X className="w-4 h-4 text-[#18181B]" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onPrintQrForDrawer(drawerId)}
+              className="p-1.5 rounded-lg border-2 border-[#18181B] hover:bg-[#F4F4F5] text-[#18181B]"
+              title="Print QR Sticker"
+            >
+              <QrCode className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg border-2 border-[#18181B] flex items-center justify-center hover:bg-[#F4F4F5]"
+            >
+              <X className="w-4 h-4 text-[#18181B]" />
+            </button>
+          </div>
         </div>
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-2 mb-4 border-b border-[#E4E4E7] pb-2 text-xs">
-          {(['ITEMS', 'CONSUME', 'TRANSFER', 'QR'] as const).map((tab) => (
+          {(['CONTENTS', 'REMOVE', 'TRANSFER', 'QR'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => {
@@ -152,10 +166,10 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
                   : 'bg-white text-[#18181B] hover:bg-[#F4F4F5]'
               }`}
             >
-              {tab === 'ITEMS' && 'Contents'}
-              {tab === 'CONSUME' && '- Consume Stock'}
-              {tab === 'TRANSFER' && '⇄ Move Stock'}
-              {tab === 'QR' && 'Drawer QR'}
+              {tab === 'CONTENTS' && 'Contents & Available'}
+              {tab === 'REMOVE' && 'Remove'}
+              {tab === 'TRANSFER' && 'Move'}
+              {tab === 'QR' && 'Compartment QR'}
             </button>
           ))}
         </div>
@@ -172,34 +186,41 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
           </div>
         )}
 
-        {/* TAB 1: ITEMS */}
-        {activeTab === 'ITEMS' && (
+        {/* TAB 1: CONTENTS */}
+        {activeTab === 'CONTENTS' && (
           <div className="space-y-4">
             {detail?.items && detail.items.length > 0 ? (
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {detail.items.map((it) => (
                   <div
                     key={it.sku}
-                    className="p-3.5 rounded-xl border-2 border-[#18181B] bg-[#FAFAFA] flex items-center justify-between"
+                    className="p-4 rounded-xl border-2 border-[#18181B] bg-[#FAFAFA] flex items-center justify-between shadow-[2px_2px_0px_#18181B]"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-sm text-[#18181B]">{it.sku}</span>
+                        <span className="font-mono font-black text-sm text-[#18181B]">{it.sku}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded bg-[#FEF08A] border border-[#18181B] font-bold">
                           {it.category}
                         </span>
                       </div>
                       <div className="text-xs font-semibold text-[#52525B] mt-1">{it.name}</div>
-                      {it.lot_number && (
-                        <div className="text-[10px] text-[#A1A1AA] font-mono mt-0.5">
-                          Lot: {it.lot_number} • Cost: ₹{it.unit_cost}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono text-xl font-black text-[#18181B]">
-                        {it.quantity} <span className="text-xs text-[#71717A] font-normal">{it.unit}</span>
+                      <div className="text-[11px] text-[#15803D] font-bold font-mono mt-1 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Available: {it.quantity} {it.unit}
                       </div>
+                    </div>
+                    
+                    {/* Quick Remove Button right on item card */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setRemoveSku(it.sku);
+                          setActiveTab('REMOVE');
+                        }}
+                        className="brutal-btn brutal-btn-yellow text-xs py-1.5 px-3"
+                      >
+                        <Minus className="w-3.5 h-3.5" /> Remove
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -207,42 +228,42 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
             ) : (
               <div className="p-8 text-center border-2 border-dashed border-[#A1A1AA] rounded-xl">
                 <Box className="w-8 h-8 text-[#A1A1AA] mx-auto mb-2" />
-                <p className="text-sm font-bold text-[#52525B]">This drawer is currently empty.</p>
+                <p className="text-sm font-bold text-[#52525B]">This compartment is empty.</p>
                 <p className="text-xs text-[#71717A] mt-1">
-                  Ready to store components or assign from incoming parcels.
+                  Ready to store components.
                 </p>
               </div>
             )}
 
-            <div className="pt-2 flex items-center justify-between">
+            <div className="pt-2 flex items-center justify-between border-t border-[#E4E4E7]">
               <button
                 onClick={() => {
                   onClose();
                   onOpenReceiveForDrawer(drawerId);
                 }}
-                className="brutal-btn brutal-btn-yellow text-xs py-2 px-4"
+                className="brutal-btn brutal-btn-mint text-xs py-2 px-4"
               >
-                <Plus className="w-4 h-4" /> Add / Receive into {drawerId}
+                <Plus className="w-4 h-4" /> Add Component into {drawerId}
               </button>
             </div>
           </div>
         )}
 
-        {/* TAB 2: CONSUME */}
-        {activeTab === 'CONSUME' && (
-          <form onSubmit={handleConsume} className="space-y-4">
+        {/* TAB 2: REMOVE */}
+        {activeTab === 'REMOVE' && (
+          <form onSubmit={handleRemoveStock} className="space-y-4">
             {detail?.items && detail.items.length > 0 ? (
               <>
                 <div>
-                  <label className="block text-xs font-black text-[#18181B] mb-1">SELECT COMPONENT</label>
+                  <label className="block text-xs font-black text-[#18181B] mb-1">SELECT COMPONENT TO REMOVE</label>
                   <select
-                    value={consumeSku}
-                    onChange={(e) => setConsumeSku(e.target.value)}
+                    value={removeSku}
+                    onChange={(e) => setRemoveSku(e.target.value)}
                     className="w-full p-2.5 rounded-lg border-2 border-[#18181B] font-mono font-bold text-xs bg-white focus:outline-none"
                   >
                     {detail.items.map((it) => (
                       <option key={it.sku} value={it.sku}>
-                        {it.sku} ({it.quantity} {it.unit} available)
+                        {it.sku} (Available: {it.quantity} {it.unit})
                       </option>
                     ))}
                   </select>
@@ -250,46 +271,45 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-black text-[#18181B] mb-1">QUANTITY TO DEDUCT</label>
+                    <label className="block text-xs font-black text-[#18181B] mb-1">QUANTITY TO REMOVE</label>
                     <input
                       type="number"
                       min={1}
-                      max={detail.items.find((i) => i.sku === consumeSku)?.quantity || 1}
-                      value={consumeQty}
-                      onChange={(e) => setConsumeQty(parseInt(e.target.value) || 1)}
+                      max={detail.items.find((i) => i.sku === removeSku)?.quantity || 1}
+                      value={removeQty}
+                      onChange={(e) => setRemoveQty(parseInt(e.target.value) || 1)}
                       className="w-full p-2.5 rounded-lg border-2 border-[#18181B] font-mono font-bold text-xs"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-[#18181B] mb-1">REQUESTER / TECH</label>
+                    <label className="block text-xs font-black text-[#18181B] mb-1">REMOVED BY</label>
                     <input
                       type="text"
-                      placeholder="e.g. Rajesh Kumar"
-                      value={requester}
-                      onChange={(e) => setRequester(e.target.value)}
-                      className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-semibold"
+                      value={userName}
+                      disabled
+                      className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-bold bg-[#F4F4F5]"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-black text-[#18181B] mb-1">PROJECT / TICKET REASON</label>
+                  <label className="block text-xs font-black text-[#18181B] mb-1">REASON / PROJECT (OPTIONAL)</label>
                   <input
                     type="text"
-                    placeholder="e.g. Hall B-204 Panel Repair"
-                    value={project}
-                    onChange={(e) => setProject(e.target.value)}
+                    placeholder="e.g. Lab testing or circuit build"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
                     className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-semibold"
                   />
                 </div>
 
-                <button type="submit" className="w-full brutal-btn brutal-btn-mint py-2.5 text-xs">
-                  <Minus className="w-4 h-4" /> Confirm Stock Deduction
+                <button type="submit" className="w-full brutal-btn brutal-btn-yellow py-2.5 text-xs">
+                  <Minus className="w-4 h-4" /> Confirm & Remove
                 </button>
               </>
             ) : (
-              <p className="text-xs text-[#71717A] italic">No items inside this drawer to consume.</p>
+              <p className="text-xs text-[#71717A] italic">No items inside this compartment to remove.</p>
             )}
           </form>
         )}
@@ -308,7 +328,7 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
                   >
                     {detail.items.map((it) => (
                       <option key={it.sku} value={it.sku}>
-                        {it.sku} ({it.quantity} available)
+                        {it.sku} (Available: {it.quantity})
                       </option>
                     ))}
                   </select>
@@ -340,12 +360,12 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
                   </div>
                 </div>
 
-                <button type="submit" className="w-full brutal-btn brutal-btn-yellow py-2.5 text-xs">
-                  <ArrowRightLeft className="w-4 h-4" /> Execute Drawer Relocation
+                <button type="submit" className="w-full brutal-btn brutal-btn-mint py-2.5 text-xs">
+                  <ArrowRightLeft className="w-4 h-4" /> Move to Drawer {targetDrawer}
                 </button>
               </>
             ) : (
-              <p className="text-xs text-[#71717A] italic">No items inside this drawer to transfer.</p>
+              <p className="text-xs text-[#71717A] italic">No items inside this compartment to move.</p>
             )}
           </form>
         )}
@@ -359,14 +379,10 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
                 src={`http://localhost:8000/api/qr/code?code=DRAWER:${drawerId}`}
                 alt={`QR code for Drawer ${drawerId}`}
                 className="w-36 h-36 mx-auto object-contain"
-                onError={(e) => {
-                  // Fallback to fetch data URI or svg
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
               />
             </div>
             <p className="text-xs text-[#52525B] font-semibold">
-              Stick this QR code on the Stanley compartment handle. Scanning it from the phone instantly opens this drawer's inventory record.
+              Stick this QR code on the Stanley compartment handle. Scanning it from your phone immediately opens this drawer.
             </p>
           </div>
         )}

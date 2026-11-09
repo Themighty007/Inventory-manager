@@ -186,46 +186,65 @@ def get_all_drawer_labels(db: Session = Depends(get_db)):
     return labels
 
 
-# ===================== OFFLINE SYNC =====================
-@api_router.post("/sync/batch", response_model=SyncBatchResponse, summary="Process batch synchronization from mobile offline queue")
-def sync_batch(req: SyncBatchRequest, db: Session = Depends(get_db)):
-    synced = 0
-    failed = 0
-    results = []
+# ===================== DEMO DATA MANAGEMENT =====================
+@api_router.post("/admin/clear-demo-data", summary="Wipe all demo items, lots, and transactions for fresh production use")
+def clear_demo_data(db: Session = Depends(get_db)):
+    try:
+        from backend.app.database.models import (
+            InventoryTransaction,
+            StockLocation,
+            StockLot,
+            InvoiceItem,
+            Invoice,
+            Parcel,
+            Reservation,
+            Item,
+            Supplier,
+        )
+        db.query(InventoryTransaction).delete()
+        db.query(StockLocation).delete()
+        db.query(StockLot).delete()
+        db.query(InvoiceItem).delete()
+        db.query(Invoice).delete()
+        db.query(Parcel).delete()
+        db.query(Reservation).delete()
+        db.query(Item).delete()
+        db.query(Supplier).delete()
+        db.commit()
+        return {"status": "success", "message": "All demo data removed. Cabinet is 100% fresh and clean."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to clear demo data: {str(e)}")
 
-    for op in req.operations:
-        existing = db.query(SyncQueue).filter_by(client_op_id=op.client_op_id).first()
-        if existing:
-            results.append({"client_op_id": op.client_op_id, "status": "ALREADY_PROCESSED"})
-            synced += 1
-            continue
 
-        try:
-            if op.action == "RECEIVE":
-                receive_req = StockReceiveRequest(**op.payload)
-                InventoryService.receive_stock(db, receive_req)
-            elif op.action == "CONSUME":
-                consume_req = StockConsumeRequest(**op.payload)
-                InventoryService.consume_stock(db, consume_req)
-            elif op.action == "TRANSFER":
-                transfer_req = StockTransferRequest(**op.payload)
-                InventoryService.transfer_stock(db, transfer_req)
-            else:
-                raise ValueError(f"Unknown action: {op.action}")
+@api_router.post("/admin/reset-demo-data", summary="Reload sample demonstration components")
+def reset_demo_data(db: Session = Depends(get_db)):
+    try:
+        from backend.app.database.seed import seed_database
+        from backend.app.database.models import (
+            InventoryTransaction,
+            StockLocation,
+            StockLot,
+            InvoiceItem,
+            Invoice,
+            Parcel,
+            Reservation,
+            Item,
+            Supplier,
+        )
+        db.query(InventoryTransaction).delete()
+        db.query(StockLocation).delete()
+        db.query(StockLot).delete()
+        db.query(InvoiceItem).delete()
+        db.query(Invoice).delete()
+        db.query(Parcel).delete()
+        db.query(Reservation).delete()
+        db.query(Item).delete()
+        db.query(Supplier).delete()
+        db.commit()
+        seed_database()
+        return {"status": "success", "message": "Demo data successfully reloaded."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to reset demo data: {str(e)}")
 
-            sq = SyncQueue(
-                client_op_id=op.client_op_id,
-                action=op.action,
-                payload=str(op.payload),
-                status="CONFIRMED",
-            )
-            db.add(sq)
-            db.commit()
-            synced += 1
-            results.append({"client_op_id": op.client_op_id, "status": "CONFIRMED"})
-        except Exception as e:
-            db.rollback()
-            failed += 1
-            results.append({"client_op_id": op.client_op_id, "status": "FAILED", "error": str(e)})
-
-    return SyncBatchResponse(synced_count=synced, failed_count=failed, results=results)

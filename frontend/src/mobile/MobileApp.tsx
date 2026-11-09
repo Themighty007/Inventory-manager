@@ -22,6 +22,9 @@ interface MobileAppProps {
 
 export const MobileApp: React.FC<MobileAppProps> = ({ onDataChanged }) => {
   const [activeTab, setActiveTab] = useState<'INTAKE' | 'CABINET' | 'DEDUCT' | 'SYNC'>('INTAKE');
+  const [userName, setUserName] = useState<string>(() => {
+    return localStorage.getItem('inventory_user_name') || 'Admin User';
+  });
   const [isOnline, setIsOnline] = useState(true);
   const [offlineQueue, setOfflineQueue] = useState<any[]>(() => {
     try {
@@ -197,17 +200,17 @@ export const MobileApp: React.FC<MobileAppProps> = ({ onDataChanged }) => {
           </div>
           <div>
             <div className="text-xs font-black tracking-tight flex items-center gap-1.5">
-              <span>aegis '26</span>
-              <span className="text-[10px] text-[#86EFAC] font-mono">MOBILE INTAKE</span>
+              <span>Smart Inventory</span>
+              <span className="text-[10px] text-[#86EFAC] font-mono">MOBILE</span>
             </div>
             <div className="text-[10px] text-[#A1A1AA] flex items-center gap-1 font-mono">
               {isOnline ? (
                 <>
-                  <Wifi className="w-3 h-3 text-[#86EFAC]" /> Connected (FastAPI :8000)
+                  <Wifi className="w-3 h-3 text-[#86EFAC]" /> Connected ({userName})
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-3 h-3 text-[#FCA5A5]" /> Offline (Cache Active)
+                  <WifiOff className="w-3 h-3 text-[#FCA5A5]" /> Offline Mode
                 </>
               )}
             </div>
