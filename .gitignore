@@ -9,5 +9,9 @@ android-app/build/
 android-app/app/build/
 data/*.db-wal
 data/*.db-shm
+android-build/
+*.idsig
+android-app/.idea/
+android-app/local.properties
 .DS_Store
 Thumbs.db

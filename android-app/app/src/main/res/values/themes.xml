@@ -1,10 +1,7 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.SmartElectronicsInventory" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/obsidian</item>
-        <item name="colorPrimaryVariant">@color/black</item>
-        <item name="colorOnPrimary">@color/white</item>
-        <item name="colorSecondary">@color/mint_green</item>
-        <item name="android:statusBarColor">@color/obsidian</item>
-        <item name="android:windowBackground">@color/canvas_cream</item>
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SmartElectronicsInventory" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:statusBarColor">#121316</item>
+        <item name="android:windowBackground">#F8F6F1</item>
     </style>
 </resources>

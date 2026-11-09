@@ -36,11 +36,28 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 
 # Static Frontend mounting
 FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+APK_PATH = Path(__file__).resolve().parent.parent.parent / "SmartElectronicsInventory.apk"
+
+@app.get("/download/app.apk")
+def download_apk():
+    if APK_PATH.exists():
+        return FileResponse(
+            APK_PATH,
+            media_type="application/vnd.android.package-archive",
+            filename="SmartElectronicsInventory.apk",
+        )
+    return {"error": "APK not found"}
+
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
     @app.get("/")
     def serve_frontend_root():
+        return FileResponse(FRONTEND_DIST / "index.html")
+
+    @app.get("/mobile")
+    @app.get("/mobile/{full_path:path}")
+    def serve_frontend_mobile(full_path: str = ""):
         return FileResponse(FRONTEND_DIST / "index.html")
 
     @app.get("/app/{full_path:path}")
