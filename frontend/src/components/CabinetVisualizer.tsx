@@ -84,7 +84,7 @@ export const CabinetVisualizer: React.FC<CabinetVisualizerProps> = ({
           <span className="text-[10px] text-[#A1A1AA] font-mono">13.5 × 5.0 × 3.5 cm</span>
         </div>
 
-        <div className="grid grid-cols-6 gap-2.5">
+        <div className="stanley-grid-small">
           {smallDrawers.map((d) => {
             const isVisible = matchesFilter(d);
             const isSelected = selectedDrawerId === d.id;
@@ -93,7 +93,7 @@ export const CabinetVisualizer: React.FC<CabinetVisualizerProps> = ({
               <div
                 key={d.id}
                 onClick={() => onSelectDrawer(d.id)}
-                className={`stanley-drawer-cell h-20 ${
+                className={`stanley-drawer-cell ${
                   d.status_color ? `drawer-status-${d.status_color}` : ''
                 } ${isSelected ? 'active-selected' : ''} ${
                   !isVisible ? 'opacity-25 pointer-events-none' : ''
@@ -138,7 +138,7 @@ export const CabinetVisualizer: React.FC<CabinetVisualizerProps> = ({
           <span className="text-[10px] text-[#A1A1AA] font-mono">13.5 × 11.0 × 6.0 cm</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="stanley-grid-large">
           {largeDrawers.map((d) => {
             const isVisible = matchesFilter(d);
             const isSelected = selectedDrawerId === d.id;
@@ -147,7 +147,7 @@ export const CabinetVisualizer: React.FC<CabinetVisualizerProps> = ({
               <div
                 key={d.id}
                 onClick={() => onSelectDrawer(d.id)}
-                className={`stanley-drawer-cell h-24 ${
+                className={`stanley-drawer-cell stanley-drawer-cell-large ${
                   d.status_color ? `drawer-status-${d.status_color}` : ''
                 } ${isSelected ? 'active-selected' : ''} ${
                   !isVisible ? 'opacity-25 pointer-events-none' : ''
