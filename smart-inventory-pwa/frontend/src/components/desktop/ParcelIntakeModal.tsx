@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { receiveStock } from '../../api/client';
-import { X, CheckCircle, Package } from 'lucide-react';
+import { X, CheckCircle, Package, FileText } from 'lucide-react';
 
 interface ParcelIntakeModalProps {
   isOpen: boolean;
@@ -8,7 +8,16 @@ interface ParcelIntakeModalProps {
   defaultDrawer?: string;
   onClose: () => void;
   onRefresh: () => void;
+  onSwitchToInvoiceUpload?: () => void;
 }
+
+const getLocalDateTimeString = () => {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(
+    now.getHours()
+  )}:${pad(now.getMinutes())}`;
+};
 
 export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
   isOpen,
@@ -16,6 +25,7 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
   defaultDrawer = 'S01',
   onClose,
   onRefresh,
+  onSwitchToInvoiceUpload,
 }) => {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
@@ -24,6 +34,8 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
   const [unitPrice, setUnitPrice] = useState(0);
   const [supplier, setSupplier] = useState('');
   const [invoice, setInvoice] = useState('');
+  const [orderDate, setOrderDate] = useState('');
+  const [deliveryTime, setDeliveryTime] = useState(getLocalDateTimeString());
   const [drawerId, setDrawerId] = useState(defaultDrawer);
   const [trackingCode, setTrackingCode] = useState('');
   const [notes, setNotes] = useState('');
@@ -34,6 +46,7 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
     if (isOpen) {
       if (defaultSku) setSku(defaultSku);
       if (defaultDrawer) setDrawerId(defaultDrawer);
+      setDeliveryTime(getLocalDateTimeString());
       setErrorMsg(null);
     }
   }, [isOpen, defaultSku, defaultDrawer]);
@@ -60,6 +73,8 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
         invoice_number: invoice.trim() || undefined,
         tracking_code: trackingCode.trim() || undefined,
         drawer_id: drawerId.toUpperCase(),
+        order_date: orderDate ? `${orderDate}T00:00:00` : null,
+        delivery_arrival_time: deliveryTime || getLocalDateTimeString(),
         notes: notes.trim() || undefined,
       });
 
@@ -72,7 +87,19 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
     }
   };
 
-  const categories = ['Microcontrollers', 'Passives', 'Electrical', 'Network', 'HVAC', 'Sensors', 'Semiconductors', 'Hardware'];
+  const categories = [
+    'Microcontrollers',
+    'Semiconductors',
+    'Passives',
+    'Electrical',
+    'Sensors',
+    'Cables & Connectors',
+    'Network',
+    'HVAC',
+    'Tools & Mechanical',
+    'Hardware',
+    'General',
+  ];
   const allDrawers: string[] = [];
   for (let i = 1; i <= 30; i++) allDrawers.push(`S${i.toString().padStart(2, '0')}`);
   for (let i = 1; i <= 9; i++) allDrawers.push(`L${i.toString().padStart(2, '0')}`);
@@ -105,6 +132,24 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
             <X className="w-4 h-4 text-[#18181B]" />
           </button>
         </div>
+
+        {onSwitchToInvoiceUpload && (
+          <div className="mb-4 p-2.5 rounded-xl bg-[#FEF9C3] border-2 border-[#18181B] flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold text-[#713F12]">
+              Have a multi-item PDF / DOCX / CSV invoice?
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onSwitchToInvoiceUpload();
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#18181B] text-[#FEF08A] text-[11px] font-black flex items-center gap-1 hover:opacity-90 shrink-0"
+            >
+              <FileText className="w-3 h-3" /> Auto-Extract Invoice →
+            </button>
+          </div>
+        )}
 
         {errorMsg && (
           <div className="mb-4 p-3 bg-[#FEE2E2] border-2 border-[#B91C1C] rounded-xl text-xs font-bold text-[#B91C1C]">
@@ -193,7 +238,7 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
                 type="text"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
-                placeholder="e.g. Mouser / DigiKey"
+                placeholder="e.g. Robu.in / Mouser"
                 className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-semibold bg-[#FAFAFA]"
               />
             </div>
@@ -205,6 +250,27 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
                 onChange={(e) => setInvoice(e.target.value)}
                 placeholder="e.g. INV-2026-901"
                 className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono bg-[#FAFAFA]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-black text-[#18181B] mb-1">ORDER DATE</label>
+              <input
+                type="date"
+                value={orderDate}
+                onChange={(e) => setOrderDate(e.target.value)}
+                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-bold bg-[#FEF9C3]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-[#18181B] mb-1">DELIVERY / ARRIVAL TIME</label>
+              <input
+                type="datetime-local"
+                value={deliveryTime}
+                onChange={(e) => setDeliveryTime(e.target.value)}
+                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-bold bg-[#DCFCE7]"
               />
             </div>
           </div>

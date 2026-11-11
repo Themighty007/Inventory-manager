@@ -11,6 +11,7 @@ import {
   AlertCircle,
   ShieldCheck,
   Clock,
+  FileText,
 } from 'lucide-react';
 
 interface MobileParcelIntakeProps {
@@ -20,7 +21,16 @@ interface MobileParcelIntakeProps {
   userName: string;
   onCompleted: (message: string) => void;
   onBack: () => void;
+  onSwitchToInvoice?: () => void;
 }
+
+const getLocalDateTimeString = () => {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(
+    now.getHours()
+  )}:${pad(now.getMinutes())}`;
+};
 
 export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
   initialCode = '',
@@ -29,37 +39,87 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
   userName,
   onCompleted,
   onBack,
+  onSwitchToInvoice,
 }) => {
   const [trackingCode, setTrackingCode] = useState(initialCode);
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Microcontrollers');
-  const [quantity, setQuantity] = useState(5);
-  const [unitPrice, setUnitPrice] = useState(250);
-  const [drawerId, setDrawerId] = useState('S01');
-  const [supplier, setSupplier] = useState('Mouser Electronics');
-  const [invoice, setInvoice] = useState('INV-2026-');
+  const [category, setCategory] = useState('General');
+  const [quantity, setQuantity] = useState<number | string>(1);
+  const [unitPrice, setUnitPrice] = useState<number | string>('');
+  const [drawerId, setDrawerId] = useState('');
+  const [supplier, setSupplier] = useState('');
+  const [invoice, setInvoice] = useState('');
+  const [orderDate, setOrderDate] = useState('');
+  const [deliveryTime, setDeliveryTime] = useState(getLocalDateTimeString());
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    // If the scanned code was a drawer stamp, pre-fill drawer
-    if (initialCode.startsWith('DRAWER:')) {
-      const parsed = initialCode.replace('DRAWER:', '').trim().toUpperCase();
-      if (drawers.some((d) => d.id === parsed)) {
-        setDrawerId(parsed);
-      }
-    } else if (initialCode.startsWith('ITEM:') || initialCode.startsWith('SKU:')) {
-      const parsedSku = initialCode.replace(/^(ITEM:|SKU:)/, '').trim().toUpperCase();
-      setSku(parsedSku);
-    } else if (initialCode) {
-      setTrackingCode(initialCode);
-      // If code looks like a SKU (no spaces, alphanumeric)
-      if (/^[A-Z0-9-]{4,15}$/i.test(initialCode)) {
-        setSku(initialCode.toUpperCase());
+    if (!initialCode) return;
+    const raw = initialCode.trim();
+
+    // 1. Check if JSON payload (e.g. smart QR label or DigiKey/Mouser app payload)
+    if (raw.startsWith('{') && raw.endsWith('}')) {
+      try {
+        const obj = JSON.parse(raw);
+        if (obj.sku || obj.item_sku || obj.partNumber) {
+          setSku(String(obj.sku || obj.item_sku || obj.partNumber).toUpperCase());
+        }
+        if (obj.name || obj.item_name || obj.description) {
+          setName(String(obj.name || obj.item_name || obj.description));
+        }
+        if (obj.quantity || obj.qty) {
+          setQuantity(Number(obj.quantity || obj.qty) || 1);
+        }
+        if (obj.price || obj.unit_price) {
+          setUnitPrice(Number(obj.price || obj.unit_price) || '');
+        }
+        if (obj.supplier || obj.vendor) {
+          setSupplier(String(obj.supplier || obj.vendor));
+        }
+        if (obj.invoice || obj.invoice_number) {
+          setInvoice(String(obj.invoice || obj.invoice_number));
+        }
+        if (obj.category) {
+          setCategory(String(obj.category));
+        }
+        if (obj.drawer || obj.drawer_id) {
+          const dId = String(obj.drawer || obj.drawer_id).toUpperCase();
+          if (drawers.some((d) => d.id === dId)) {
+            setDrawerId(dId);
+          }
+        }
+        return;
+      } catch {
+        // Not valid JSON, continue with pattern matching
       }
     }
+
+    // 2. Direct Drawer Code or Drawer in URL: "DRAWER:S04", "S04", "https://...?drawer=S04", "drawer/S04"
+    const urlDrawerMatch = raw.match(/(?:drawer[=\/:]|#|\b)([SL]\d{2})\b/i);
+    if (urlDrawerMatch) {
+      const candidate = urlDrawerMatch[1].toUpperCase();
+      if (drawers.some((d) => d.id === candidate)) {
+        setDrawerId(candidate);
+        // If the code was ONLY the drawer (e.g. "DRAWER:S04" or "S04"), return now
+        if (raw.match(/^(?:DRAWER:)?([SL]\d{2})$/i)) {
+          return;
+        }
+      }
+    }
+
+    // 3. SKU / Item Prefix, e.g. "ITEM:ESP32" or "SKU:RES-10K"
+    if (/^(?:ITEM|SKU):/i.test(raw)) {
+      const parsedSku = raw.replace(/^(?:ITEM|SKU):/i, '').trim().toUpperCase();
+      setSku(parsedSku);
+      return;
+    }
+
+    // 4. Tracking code or raw barcode
+    setTrackingCode(raw);
+    setSku(raw.toUpperCase());
   }, [initialCode, drawers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,9 +129,12 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
       return;
     }
     if (!drawerId) {
-      setErrorMsg('Target drawer compartment is required.');
+      setErrorMsg('Please tap a compartment below to assign where to store this item.');
       return;
     }
+
+    const finalQty = typeof quantity === 'number' ? quantity : parseInt(quantity) || 1;
+    const finalPrice = typeof unitPrice === 'number' ? unitPrice : parseFloat(unitPrice) || 0;
 
     setSubmitting(true);
     setErrorMsg(null);
@@ -82,12 +145,14 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
       item_name: name.trim() || sku.trim().toUpperCase(),
       category,
       unit: 'pcs',
-      quantity,
-      unit_price: unitPrice,
-      supplier: supplier.trim() || 'Vendor',
+      quantity: finalQty,
+      unit_price: finalPrice,
+      supplier: supplier.trim() || undefined,
       invoice_number: invoice.trim() || undefined,
       drawer_id: drawerId.toUpperCase(),
       sub_tray: 'MAIN',
+      order_date: orderDate ? `${orderDate}T00:00:00` : null,
+      delivery_arrival_time: deliveryTime || getLocalDateTimeString(),
       notes: `Registered via mobile PWA by ${userName}. ${notes}`.trim(),
     };
 
@@ -116,6 +181,7 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
   };
 
   const categories = [
+    'General',
     'Microcontrollers',
     'Passives',
     'Electrical',
@@ -123,6 +189,8 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
     'HVAC',
     'Sensors',
     'Semiconductors',
+    'Cables & Connectors',
+    'Tools & Mechanical',
     'Hardware',
   ];
 
@@ -144,6 +212,21 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
           {isOnline ? 'Live Master Connected' : 'Offline Queue Mode'}
         </span>
       </div>
+
+      {onSwitchToInvoice && (
+        <button
+          type="button"
+          onClick={onSwitchToInvoice}
+          className="mb-3 p-2.5 rounded-xl bg-[#FEF9C3] border-2 border-[#18181B] flex items-center justify-between gap-2 text-left"
+        >
+          <span className="text-[11px] font-bold text-[#713F12]">
+            Upload a PDF / Doc Invoice instead?
+          </span>
+          <span className="px-2 py-0.5 rounded-lg bg-[#18181B] text-[#FEF08A] text-[10px] font-black flex items-center gap-1 shrink-0">
+            <FileText className="w-3 h-3" /> Auto-Extract →
+          </span>
+        </button>
+      )}
 
       {/* Scanned Badge Banner */}
       {trackingCode && (
@@ -186,8 +269,8 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
                 type="text"
                 value={sku}
                 onChange={(e) => setSku(e.target.value.toUpperCase())}
-                placeholder="e.g. ESP32-WROOM-32"
-                className="w-full p-2.5 text-xs font-mono font-black rounded-lg border-2 border-[#18181B] bg-[#FAFAFA]"
+                placeholder="Enter or scan SKU..."
+                className="w-full p-2.5 text-xs font-mono font-black rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
                 required
               />
             </div>
@@ -197,8 +280,9 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
                 type="number"
                 min={1}
                 value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                className="w-full p-2.5 text-xs font-mono font-black rounded-lg border-2 border-[#18181B] bg-[#FAFAFA]"
+                onChange={(e) => setQuantity(e.target.value === '' ? '' : parseInt(e.target.value) || 1)}
+                placeholder="Qty"
+                className="w-full p-2.5 text-xs font-mono font-black rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
                 required
               />
             </div>
@@ -210,8 +294,8 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Dual-Core Wi-Fi & BLE Microcontroller"
-              className="w-full p-2.5 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA]"
+              placeholder="Component description / part name (optional)..."
+              className="w-full p-2.5 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
             />
           </div>
 
@@ -234,8 +318,9 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
                 type="number"
                 min={0}
                 value={unitPrice}
-                onChange={(e) => setUnitPrice(parseFloat(e.target.value) || 0)}
-                className="w-full p-2.5 text-xs font-mono font-bold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA]"
+                onChange={(e) => setUnitPrice(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                placeholder="Optional (₹)"
+                className="w-full p-2.5 text-xs font-mono font-bold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
               />
             </div>
           </div>
@@ -245,15 +330,21 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
         <div className="bg-white p-4 rounded-2xl border-2 border-[#18181B] shadow-[3px_3px_0px_#18181B] space-y-3">
           <div className="flex items-center justify-between pb-1 border-b border-[#E4E4E7]">
             <span className="text-xs font-black uppercase tracking-wider text-[#71717A]">
-              Stanley Cabinet Compartment *
+              Cabinet Compartment *
             </span>
-            <span className="font-mono text-xs font-black bg-[#FEF08A] px-2 py-0.5 rounded border border-[#18181B]">
-              Selected: {drawerId}
-            </span>
+            {drawerId ? (
+              <span className="font-mono text-xs font-black bg-[#86EFAC] text-[#064E3B] px-2 py-0.5 rounded border border-[#18181B]">
+                ✓ Selected: {drawerId}
+              </span>
+            ) : (
+              <span className="font-mono text-xs font-black bg-[#FEF08A] text-[#713F12] px-2 py-0.5 rounded border border-[#18181B] animate-pulse">
+                ⚠️ Tap to Select
+              </span>
+            )}
           </div>
 
           <p className="text-[11px] text-[#71717A]">
-            Tap any compartment to assign this parcel:
+            {drawerId ? `Item will be stored in Compartment ${drawerId}. Tap any other box to change:` : 'Tap any compartment below to assign this item:'}
           </p>
 
           <div className="grid grid-cols-6 gap-1 max-h-36 overflow-y-auto p-1.5 bg-[#FAFAFA] border-2 border-[#18181B] rounded-xl">
@@ -264,7 +355,7 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
                 onClick={() => setDrawerId(d.id)}
                 className={`py-1.5 rounded-lg border font-mono font-black text-[11px] transition-all ${
                   drawerId === d.id
-                    ? 'bg-[#18181B] text-white border-[#18181B] shadow-[1px_1px_0px_#18181B]'
+                    ? 'bg-[#18181B] text-[#86EFAC] border-[#18181B] shadow-[1px_1px_0px_#18181B] scale-105'
                     : d.is_occupied
                     ? 'bg-[#FEF08A] text-[#18181B] border-[#18181B]'
                     : 'bg-white text-[#71717A] border-[#D4D4D8]'
@@ -279,7 +370,7 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
         {/* Invoice & Supplier */}
         <div className="bg-white p-4 rounded-2xl border-2 border-[#18181B] shadow-[3px_3px_0px_#18181B] space-y-3">
           <div className="text-xs font-black uppercase tracking-wider text-[#71717A] pb-1 border-b border-[#E4E4E7]">
-            Procurement & Tracking Details
+            Procurement & Tracking Details (Optional)
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
@@ -289,7 +380,8 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
                 type="text"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
-                className="w-full p-2.5 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA]"
+                placeholder="Vendor name..."
+                className="w-full p-2.5 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
               />
             </div>
             <div>
@@ -298,7 +390,26 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
                 type="text"
                 value={invoice}
                 onChange={(e) => setInvoice(e.target.value)}
-                className="w-full p-2.5 text-xs font-mono rounded-lg border-2 border-[#18181B] bg-[#FAFAFA]"
+                placeholder="Bill / Invoice ref..."
+                className="w-full p-2.5 text-xs font-mono rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-[#18181B] block mb-1">ORDER DATE</label>
+              <input
+                type="date"
+                value={orderDate}
+                onChange={(e) => setOrderDate(e.target.value)}
+                className="w-full p-2.5 text-xs font-mono font-bold rounded-lg border-2 border-[#18181B] bg-[#FEF9C3]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-[#18181B] block mb-1">ARRIVAL TIME</label>
+              <input
+                type="datetime-local"
+                value={deliveryTime}
+                onChange={(e) => setDeliveryTime(e.target.value)}
+                className="w-full p-2.5 text-[11px] font-mono font-bold rounded-lg border-2 border-[#18181B] bg-[#DCFCE7]"
               />
             </div>
           </div>
@@ -313,12 +424,12 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
           {isOnline ? (
             <>
               <CheckCircle className="w-4 h-4" />
-              {submitting ? 'Registering to Master...' : `Confirm Intake → Drawer ${drawerId}`}
+              {submitting ? 'Registering to Master...' : drawerId ? `Confirm Intake → Drawer ${drawerId}` : 'Select a Compartment to Confirm'}
             </>
           ) : (
             <>
               <Clock className="w-4 h-4" />
-              {submitting ? 'Storing in IndexedDB...' : `Queue Offline Intake → Drawer ${drawerId}`}
+              {submitting ? 'Storing in IndexedDB...' : drawerId ? `Queue Offline Intake → Drawer ${drawerId}` : 'Select a Compartment to Confirm'}
             </>
           )}
         </button>

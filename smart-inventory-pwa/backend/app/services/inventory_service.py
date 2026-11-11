@@ -1,8 +1,9 @@
 import io
 import json
+import uuid
 import base64
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 
@@ -34,6 +35,9 @@ from backend.app.schemas.inventory import (
     TransactionResponse,
     SyncBatchRequest,
     SyncBatchResponse,
+    InvoiceCommitRequest,
+    InvoiceSummaryResponse,
+    InvoiceItemDetailResponse,
 )
 
 
@@ -153,6 +157,8 @@ class InventoryService:
                 if loc.quantity > 0
             ]
 
+            last_order, last_delivery = InventoryService._latest_item_dates(it)
+
             results.append(
                 ItemResponse(
                     id=it.id,
@@ -166,90 +172,173 @@ class InventoryService:
                     datasheet_url=it.datasheet_url,
                     total_available=total_avail,
                     is_low_stock=total_avail <= it.min_stock_threshold,
+                    last_order_date=last_order,
+                    last_delivery_time=last_delivery,
                     locations=locations,
                 )
             )
         return results
 
     @staticmethod
-    def receive_stock(db: Session, req: StockReceiveRequest) -> Dict[str, Any]:
-        drawer = db.query(Drawer).filter(Drawer.id == req.drawer_id.upper()).first()
-        if not drawer:
-            raise ValueError(f"Target drawer '{req.drawer_id}' does not exist.")
+    def _latest_item_dates(it: Item) -> Tuple[Optional[datetime], Optional[datetime]]:
+        lots_sorted = sorted(it.lots, key=lambda l: l.id or 0, reverse=True)
+        txs_sorted = sorted(it.transactions, key=lambda t: t.id or 0, reverse=True)
+        last_order = next((l.order_date for l in lots_sorted if l.order_date), None)
+        if not last_order:
+            last_order = next((t.order_date for t in txs_sorted if t.order_date), None)
+        last_delivery = next((l.delivery_arrival_time for l in lots_sorted if l.delivery_arrival_time), None)
+        if not last_delivery:
+            last_delivery = next((t.delivery_arrival_time for t in txs_sorted if t.delivery_arrival_time), None)
+        return last_order, last_delivery
 
-        sku = req.item_sku.strip().upper()
-        item = db.query(Item).filter(Item.sku == sku).first()
+    @staticmethod
+    def _upsert_stock_in_session(
+        db: Session,
+        *,
+        sku: str,
+        item_name: Optional[str],
+        category: str,
+        unit: str,
+        quantity: int,
+        unit_price: float,
+        drawer_id: str,
+        sub_tray: str = "MAIN",
+        supplier: Optional[str] = None,
+        invoice_number: Optional[str] = None,
+        tracking_code: Optional[str] = None,
+        order_date: Optional[datetime] = None,
+        delivery_arrival_time: Optional[datetime] = None,
+        notes: Optional[str] = None,
+    ) -> Tuple[Item, Drawer, int]:
+        drawer = db.query(Drawer).filter(Drawer.id == drawer_id.strip().upper()).first()
+        if not drawer:
+            raise ValueError(f"Target drawer '{drawer_id}' does not exist.")
+
+        clean_sku = sku.strip().upper()
+        item = db.query(Item).filter(Item.sku == clean_sku).first()
+        clean_name = (item_name or "").strip()
 
         if not item:
             item = Item(
-                sku=sku,
-                name=req.item_name or sku,
-                category=req.category,
-                unit=req.unit,
-                unit_cost=req.unit_price,
+                sku=clean_sku,
+                name=clean_name or clean_sku,
+                category=category or "General",
+                unit=unit or "pcs",
+                unit_cost=unit_price or 0.0,
             )
             db.add(item)
             db.flush()
+        else:
+            if item.name == item.sku and clean_name:
+                item.name = clean_name
+            if (not item.unit_cost or item.unit_cost == 0.0) and unit_price > 0:
+                item.unit_cost = unit_price
 
         loc = (
             db.query(StockLocation)
-            .filter_by(item_id=item.id, drawer_id=drawer.id, sub_tray=req.sub_tray)
+            .filter_by(item_id=item.id, drawer_id=drawer.id, sub_tray=sub_tray or "MAIN")
             .first()
         )
         if not loc:
             loc = StockLocation(
                 item_id=item.id,
                 drawer_id=drawer.id,
-                quantity=req.quantity,
-                sub_tray=req.sub_tray,
+                quantity=quantity,
+                sub_tray=sub_tray or "MAIN",
             )
             db.add(loc)
         else:
-            loc.quantity += req.quantity
+            loc.quantity += quantity
 
         db.flush()
+
+        delivery_dt = delivery_arrival_time or datetime.now().replace(second=0, microsecond=0)
+        eff_cost = unit_price if unit_price > 0 else (item.unit_cost or 0.0)
+
+        lot = StockLot(
+            lot_number=f"LOT-{clean_sku[:14]}-{uuid.uuid4().hex[:8].upper()}",
+            item_id=item.id,
+            supplier=supplier or "Standard Vendor",
+            invoice_number=invoice_number,
+            received_quantity=quantity,
+            remaining_quantity=quantity,
+            unit_cost=eff_cost,
+            order_date=order_date,
+            delivery_arrival_time=delivery_dt,
+            received_at=delivery_dt,
+        )
+        db.add(lot)
 
         total_avail = sum(
             l.quantity
             for l in db.query(StockLocation).filter_by(item_id=item.id).all()
         )
 
-        ref_doc = req.invoice_number or req.tracking_code or "RECEIVE-DIRECT"
+        ref_doc = invoice_number or tracking_code or "RECEIVE-DIRECT"
         tx = InventoryTransaction(
             item_id=item.id,
             drawer_id=drawer.id,
             action_type="RECEIVE",
-            change_qty=req.quantity,
+            change_qty=quantity,
             balance_after=total_avail,
             reference_doc=ref_doc,
-            notes=req.notes or f"Received {req.quantity} units into {drawer.id}",
+            notes=notes or f"Received {quantity} {item.unit} into {drawer.id}",
+            order_date=order_date,
+            delivery_arrival_time=delivery_dt,
         )
         db.add(tx)
 
-        if req.tracking_code:
-            existing_parcel = (
-                db.query(Parcel)
-                .filter_by(tracking_code=req.tracking_code)
-                .first()
-            )
+        parcel_code = (tracking_code or "").strip()
+        if not parcel_code and invoice_number:
+            candidate = f"INV:{invoice_number}:{clean_sku}"
+            if db.query(Parcel).filter_by(tracking_code=candidate).first():
+                candidate = f"INV:{invoice_number}:{clean_sku}:{uuid.uuid4().hex[:6]}"
+            parcel_code = candidate
+
+        if parcel_code:
+            existing_parcel = db.query(Parcel).filter_by(tracking_code=parcel_code).first()
             if not existing_parcel:
                 parcel = Parcel(
-                    tracking_code=req.tracking_code,
-                    supplier=req.supplier or "Standard Vendor",
-                    invoice_number=req.invoice_number,
-                    item_sku=sku,
+                    tracking_code=parcel_code,
+                    supplier=supplier or "Standard Vendor",
+                    invoice_number=invoice_number,
+                    item_sku=clean_sku,
                     drawer_id=drawer.id,
-                    quantity=req.quantity,
-                    notes=req.notes,
+                    quantity=quantity,
+                    order_date=order_date,
+                    delivery_arrival_time=delivery_dt,
+                    notes=notes,
                 )
                 db.add(parcel)
+
+        return item, drawer, total_avail
+
+    @staticmethod
+    def receive_stock(db: Session, req: StockReceiveRequest) -> Dict[str, Any]:
+        item, drawer, total_avail = InventoryService._upsert_stock_in_session(
+            db,
+            sku=req.item_sku,
+            item_name=req.item_name,
+            category=req.category,
+            unit=req.unit,
+            quantity=req.quantity,
+            unit_price=req.unit_price,
+            drawer_id=req.drawer_id,
+            sub_tray=req.sub_tray,
+            supplier=req.supplier,
+            invoice_number=req.invoice_number,
+            tracking_code=req.tracking_code,
+            order_date=req.order_date,
+            delivery_arrival_time=req.delivery_arrival_time,
+            notes=req.notes,
+        )
 
         db.commit()
 
         return {
             "status": "success",
-            "message": f"Successfully received {req.quantity} {item.unit} of {sku} into Drawer {drawer.id}.",
-            "item_sku": sku,
+            "message": f"Successfully received {req.quantity} {item.unit} of {item.sku} into Drawer {drawer.id}.",
+            "item_sku": item.sku,
             "drawer_id": drawer.id,
             "new_balance": total_avail,
         }
@@ -497,12 +586,15 @@ class InventoryService:
                 TransactionResponse(
                     id=tx.id,
                     item_sku=tx.item.sku if tx.item else "UNKNOWN",
+                    item_name=tx.item.name if tx.item else None,
                     drawer_id=tx.drawer_id,
                     action_type=tx.action_type,
                     change_qty=tx.change_qty,
                     balance_after=tx.balance_after,
                     reference_doc=tx.reference_doc,
                     notes=tx.notes,
+                    order_date=tx.order_date,
+                    delivery_arrival_time=tx.delivery_arrival_time,
                     timestamp=tx.timestamp,
                 )
             )
@@ -536,6 +628,18 @@ class InventoryService:
             .all()
         )
 
+        invoices = (
+            db.query(Invoice)
+            .filter(
+                or_(
+                    Invoice.invoice_number.ilike(term),
+                    Invoice.sale_order_number.ilike(term),
+                    Invoice.supplier.ilike(term),
+                )
+            )
+            .all()
+        )
+
         return {
             "query": query_str,
             "items": [
@@ -557,21 +661,32 @@ class InventoryService:
                 }
                 for p in parcels
             ],
+            "invoices": [
+                {
+                    "id": inv.id,
+                    "invoice_number": inv.invoice_number,
+                    "sale_order_number": inv.sale_order_number,
+                    "supplier": inv.supplier,
+                    "order_date": inv.order_date,
+                    "delivery_arrival_time": inv.delivery_arrival_time,
+                }
+                for inv in invoices
+            ],
         }
 
     @staticmethod
     def generate_qr_svg(code: str) -> str:
         factory = qrcode.image.svg.SvgPathImage
         qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_Q,
             box_size=10,
-            border=2,
+            border=4,
             image_factory=factory,
         )
         qr.add_data(code)
         qr.make(fit=True)
-        img = qr.make_image(fill_color="#18181B", back_color="#FFFFFF")
+        img = qr.make_image(fill_color="#000000", back_color="#FFFFFF")
 
         stream = io.BytesIO()
         img.save(stream)
@@ -610,6 +725,9 @@ class InventoryService:
                 elif op.action == "TRANSFER":
                     req = StockTransferRequest(**op.payload)
                     res = InventoryService.transfer_stock(db, req)
+                elif op.action == "INVOICE_COMMIT":
+                    req = InvoiceCommitRequest(**op.payload)
+                    res = InventoryService.commit_invoice(db, req)
                 else:
                     raise ValueError(f"Unsupported action: {op.action}")
 
@@ -647,3 +765,191 @@ class InventoryService:
             failed_count=failed_count,
             results=results,
         )
+
+    # ===================== INVOICE WORKFLOW =====================
+    @staticmethod
+    def commit_invoice(db: Session, req: InvoiceCommitRequest) -> Dict[str, Any]:
+        if not req.items:
+            raise ValueError("Invoice commit requires at least one component item.")
+
+        inv_num = req.invoice_number.strip()
+        if not inv_num:
+            raise ValueError("Invoice number cannot be empty.")
+
+        existing_inv = db.query(Invoice).filter(Invoice.invoice_number == inv_num).first()
+        if existing_inv and not req.allow_duplicate_append:
+            raise ValueError(
+                f"Invoice '{inv_num}' is already logged in the database. "
+                "Enable append mode if you intentionally want to log additional batches for this invoice."
+            )
+
+        delivery_dt = req.delivery_arrival_time or datetime.now().replace(second=0, microsecond=0)
+        order_dt = req.order_date
+
+        try:
+            if existing_inv:
+                inv = existing_inv
+                inv.delivery_arrival_time = delivery_dt
+                if order_dt and not inv.order_date:
+                    inv.order_date = order_dt
+                if req.notes:
+                    inv.notes = f"{inv.notes or ''} | {req.notes}".strip(" |")
+            else:
+                inv = Invoice(
+                    invoice_number=inv_num,
+                    sale_order_number=req.sale_order_number,
+                    supplier=(req.supplier or "Unknown Vendor").strip(),
+                    subtotal_amount=req.subtotal_amount,
+                    tax_amount=req.tax_amount,
+                    total_amount=req.total_amount,
+                    currency=req.currency or "INR",
+                    order_date=order_dt,
+                    delivery_arrival_time=delivery_dt,
+                    received_date=delivery_dt,
+                    source_filename=req.source_filename,
+                    notes=req.notes,
+                    status="LOGGED",
+                )
+                db.add(inv)
+                db.flush()
+
+            committed_results: List[Dict[str, Any]] = []
+            drawers_used: List[str] = []
+            total_units = 0
+
+            for line in req.items:
+                item, drawer, total_avail = InventoryService._upsert_stock_in_session(
+                    db,
+                    sku=line.sku,
+                    item_name=line.name,
+                    category=line.category,
+                    unit=line.unit,
+                    quantity=line.quantity,
+                    unit_price=line.unit_price,
+                    drawer_id=line.drawer_id,
+                    sub_tray=line.sub_tray,
+                    supplier=inv.supplier,
+                    invoice_number=inv.invoice_number,
+                    tracking_code=req.sale_order_number and f"SO:{req.sale_order_number}:{line.sku.strip().upper()}",
+                    order_date=order_dt,
+                    delivery_arrival_time=delivery_dt,
+                    notes=line.notes or f"Invoice {inv.invoice_number} ({inv.supplier}) -> {line.drawer_id.upper()}",
+                )
+
+                inv_item = InvoiceItem(
+                    invoice_id=inv.id,
+                    sku=item.sku,
+                    item_name=line.name.strip() or item.name,
+                    quantity=line.quantity,
+                    unit_price=line.unit_price,
+                    drawer_id=drawer.id,
+                    hsn_code=line.hsn_code,
+                    tax_rate=line.tax_rate,
+                    line_total=line.line_total or round(line.unit_price * line.quantity, 2),
+                    status="LOGGED",
+                )
+                db.add(inv_item)
+
+                total_units += line.quantity
+                if drawer.id not in drawers_used:
+                    drawers_used.append(drawer.id)
+                committed_results.append({
+                    "sku": item.sku,
+                    "name": item.name,
+                    "quantity": line.quantity,
+                    "drawer_id": drawer.id,
+                    "new_balance": total_avail,
+                })
+
+            db.commit()
+            db.refresh(inv)
+
+            return {
+                "status": "success",
+                "message": (
+                    f"Logged {len(committed_results)} components ({total_units} units) "
+                    f"from invoice {inv.invoice_number} across {len(drawers_used)} compartment(s)."
+                ),
+                "invoice_id": inv.id,
+                "invoice_number": inv.invoice_number,
+                "sale_order_number": inv.sale_order_number,
+                "supplier": inv.supplier,
+                "order_date": inv.order_date,
+                "delivery_arrival_time": inv.delivery_arrival_time,
+                "items_logged": len(committed_results),
+                "total_units": total_units,
+                "drawers_used": drawers_used,
+                "results": committed_results,
+            }
+        except Exception:
+            db.rollback()
+            raise
+
+    @staticmethod
+    def _build_invoice_summary(inv: Invoice) -> InvoiceSummaryResponse:
+        drawers = sorted({it.drawer_id for it in inv.items if it.drawer_id})
+        total_units = sum(it.quantity for it in inv.items)
+        return InvoiceSummaryResponse(
+            id=inv.id,
+            invoice_number=inv.invoice_number,
+            sale_order_number=inv.sale_order_number,
+            supplier=inv.supplier,
+            subtotal_amount=inv.subtotal_amount or 0.0,
+            tax_amount=inv.tax_amount or 0.0,
+            total_amount=inv.total_amount or 0.0,
+            currency=inv.currency or "INR",
+            order_date=inv.order_date,
+            delivery_arrival_time=inv.delivery_arrival_time,
+            received_date=inv.received_date,
+            source_filename=inv.source_filename,
+            status=inv.status or "LOGGED",
+            items_count=len(inv.items),
+            total_units=total_units,
+            drawers_used=drawers,
+            items=[
+                InvoiceItemDetailResponse(
+                    id=it.id,
+                    sku=it.sku,
+                    item_name=it.item_name,
+                    quantity=it.quantity,
+                    unit_price=it.unit_price,
+                    drawer_id=it.drawer_id,
+                    hsn_code=it.hsn_code,
+                    tax_rate=it.tax_rate or 0.0,
+                    line_total=it.line_total or round(it.quantity * it.unit_price, 2),
+                    status=it.status or "LOGGED",
+                )
+                for it in inv.items
+            ],
+        )
+
+    @staticmethod
+    def list_invoices(
+        db: Session,
+        query: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[InvoiceSummaryResponse]:
+        q = db.query(Invoice).order_by(Invoice.id.desc())
+        invoices = q.limit(limit).all()
+        summaries = [InventoryService._build_invoice_summary(inv) for inv in invoices]
+        if query and query.strip():
+            term = query.strip().lower()
+            summaries = [
+                s
+                for s in summaries
+                if (
+                    term in s.invoice_number.lower()
+                    or term in (s.sale_order_number or "").lower()
+                    or term in s.supplier.lower()
+                    or term in (s.source_filename or "").lower()
+                    or any(term in it.sku.lower() or term in (it.item_name or "").lower() for it in s.items)
+                )
+            ]
+        return summaries
+
+    @staticmethod
+    def get_invoice_detail(db: Session, invoice_id: int) -> InvoiceSummaryResponse:
+        inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        if not inv:
+            raise ValueError(f"Invoice #{invoice_id} not found.")
+        return InventoryService._build_invoice_summary(inv)

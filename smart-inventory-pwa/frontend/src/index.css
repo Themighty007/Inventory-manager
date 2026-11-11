@@ -26,168 +26,176 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--canvas-bg);
+    color: #18181B;
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
-html, body, #root {
-  height: 100%;
-  width: 100%;
-}
+@layer components {
+  /* Layout Framework */
+  .app-layout {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background-color: var(--canvas-bg);
+  }
 
-body {
-  font-family: var(--font-sans);
-  background-color: var(--canvas-bg);
-  color: #18181B;
-  -webkit-font-smoothing: antialiased;
-}
+  .sidebar-container {
+    width: 256px;
+    min-width: 256px;
+    height: 100%;
+    background-color: #121316;
+    border-right: 2px solid #18181B;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px 16px;
+    color: #FFFFFF;
+    z-index: 20;
+  }
 
-/* Layout Framework */
-.app-layout {
-  display: flex;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  background-color: var(--canvas-bg);
-}
+  .main-canvas {
+    flex: 1;
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--canvas-bg);
+  }
 
-.sidebar-container {
-  width: 260px;
-  min-width: 260px;
-  height: 100%;
-  background-color: #121316;
-  border-right: 2px solid #18181B;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 16px;
-  color: #FFFFFF;
-  z-index: 20;
-}
+  .top-header {
+    background-color: #FAF9F5;
+    border-bottom: 2px solid #18181B;
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
 
-.main-canvas {
-  flex: 1;
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--canvas-bg);
-}
+  .content-body {
+    padding: 24px 28px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1600px;
+    width: 100%;
+    margin: 0 auto;
+  }
 
-.top-header {
-  background-color: #FAF9F5;
-  border-bottom: 2px solid #18181B;
-  padding: 12px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
+  /* Neo-Brutalist Utilities */
+  .brutal-card {
+    background-color: var(--card-bg);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: var(--shadow-offset);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
 
-.content-body {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 1600px;
-  width: 100%;
-  margin: 0 auto;
-}
+  .brutal-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 9px 16px;
+    border: var(--border-width) solid var(--border-color);
+    border-radius: 10px;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.25;
+    white-space: nowrap;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.1s ease;
+    user-select: none;
+  }
 
-/* Neo-Brutalist Utilities */
-.brutal-card {
-  background-color: var(--card-bg);
-  border: var(--border-width) solid var(--border-color);
-  border-radius: 14px;
-  box-shadow: var(--shadow-offset);
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
+  .brutal-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0px #18181B;
+  }
 
-.brutal-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border: var(--border-width) solid var(--border-color);
-  border-radius: 10px;
-  font-family: var(--font-sans);
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.1s ease;
-  user-select: none;
-}
+  .brutal-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: var(--shadow-active);
+  }
 
-.brutal-btn:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 3px 3px 0px #18181B;
-}
+  .brutal-btn-mint {
+    background-color: var(--accent-mint);
+    color: #064E3B;
+  }
 
-.brutal-btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: var(--shadow-active);
-}
+  .brutal-btn-yellow {
+    background-color: var(--accent-yellow);
+    color: #713F12;
+  }
 
-.brutal-btn-mint {
-  background-color: var(--accent-mint);
-  color: #064E3B;
-}
+  .brutal-btn-coral {
+    background-color: var(--accent-coral);
+    color: #7F1D1D;
+  }
 
-.brutal-btn-yellow {
-  background-color: var(--accent-yellow);
-  color: #713F12;
-}
+  .brutal-btn-white {
+    background-color: #FFFFFF;
+    color: #18181B;
+  }
 
-.brutal-btn-coral {
-  background-color: var(--accent-coral);
-  color: #7F1D1D;
-}
+  .brutal-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+    border: 1.5px solid var(--border-color);
+    user-select: none;
+  }
 
-.brutal-btn-white {
-  background-color: #FFFFFF;
-  color: #18181B;
-}
+  .pill-mint {
+    background-color: var(--accent-mint);
+    color: #064E3B;
+  }
 
-.brutal-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-size: 11px;
-  font-weight: 800;
-  border: 1.5px solid var(--border-color);
-  user-select: none;
-}
+  .pill-yellow {
+    background-color: var(--accent-yellow);
+    color: #713F12;
+  }
 
-.pill-mint {
-  background-color: var(--accent-mint);
-  color: #064E3B;
-}
-
-.pill-yellow {
-  background-color: var(--accent-yellow);
-  color: #713F12;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(18, 19, 22, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  padding: 16px;
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(18, 19, 22, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 16px;
+  }
 }
 
 /* Stanley 1-93-981 Physical Cabinet Layout */
@@ -275,4 +283,30 @@ body {
 
 .drawer-status-gray {
   border-left: 4px solid #52525B !important;
+}
+
+/* Scanner & QR Reader Elements */
+#qr-reader {
+  width: 100% !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 52vh !important;
+  object-fit: cover !important;
+  border-radius: 14px !important;
+}
+
+#qr-reader__scan_region {
+  background: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#qr-reader__dashboard {
+  padding: 4px !important;
 }

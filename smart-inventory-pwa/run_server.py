@@ -84,6 +84,13 @@ if __name__ == "__main__":
     print("  Camera access and 'Add to Home Screen' (PWA) will activate smoothly.")
     print("=" * 72)
 
+    # Seed database once synchronously before launching listener threads
+    try:
+        from backend.app.database.seed import seed_database
+        seed_database()
+    except Exception as e:
+        print(f"Database init notice: {e}")
+
     # Start HTTP server in a separate daemon thread
     http_thread = threading.Thread(target=start_http_server, daemon=True)
     http_thread.start()

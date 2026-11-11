@@ -1,28 +1,46 @@
 import React, { useState } from 'react';
 import { ItemResponse } from '../../types/inventory';
-import { Search, Plus, Package } from 'lucide-react';
+import { Plus, Package } from 'lucide-react';
 
 interface InventoryTableProps {
   items: ItemResponse[];
+  searchQuery?: string;
   onOpenReceiveModal: (defaultSku?: string) => void;
   onOpenDrawerModal: (drawerId: string) => void;
 }
 
 export const InventoryTable: React.FC<InventoryTableProps> = ({
   items,
+  searchQuery = '',
   onOpenReceiveModal,
   onOpenDrawerModal,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
-  const categories = ['ALL', 'Electrical', 'Network', 'HVAC', 'Microcontrollers', 'Passives', 'Sensors'];
+  const categories = [
+    'ALL',
+    'Microcontrollers',
+    'Semiconductors',
+    'Passives',
+    'Electrical',
+    'Sensors',
+    'Cables & Connectors',
+    'Network',
+    'HVAC',
+    'Tools & Mechanical',
+    'Hardware',
+    'General',
+  ];
+
+  const effectiveSearch = searchQuery.trim().toLowerCase();
 
   const filteredItems = items.filter((it) => {
     const matchesSearch =
-      it.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      it.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (it.description && it.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      !effectiveSearch ||
+      it.sku.toLowerCase().includes(effectiveSearch) ||
+      it.name.toLowerCase().includes(effectiveSearch) ||
+      (it.description && it.description.toLowerCase().includes(effectiveSearch)) ||
+      it.locations.some((l) => l.drawer_id.toLowerCase().includes(effectiveSearch));
 
     const matchesCategory = selectedCategory === 'ALL' || it.category === selectedCategory;
 
@@ -30,11 +48,11 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
   });
 
   return (
-    <div className="brutal-card p-6 bg-white mb-6">
-      {/* Table Header & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4 pb-3 border-b-2 border-[#18181B]">
+    <div className="brutal-card p-6 bg-white">
+      {/* Table Header & Compact Filter */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-5 pb-4 border-b-2 border-[#18181B]">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#86EFAC] border-2 border-[#18181B] flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-[#86EFAC] border-2 border-[#18181B] flex items-center justify-center shadow-[2px_2px_0px_#18181B] shrink-0">
             <Package className="w-5 h-5 text-[#064E3B]" />
           </div>
           <div>
@@ -42,48 +60,26 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
               Inventory List
             </h3>
             <p className="text-xs text-[#71717A] font-semibold">
-              All registered electronic components and physical drawer locations
+              {filteredItems.length} component{filteredItems.length === 1 ? '' : 's'} shown across physical cabinet drawers
             </p>
           </div>
         </div>
 
-        {/* Search & Actions */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative">
-            <Search className="w-4 h-4 text-[#71717A] absolute left-3 top-2.5" />
-            <input
-              type="text"
-              placeholder="Search components or SKUs..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 pr-3 py-1.5 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] focus:outline-none focus:bg-white w-64"
-            />
-          </div>
-
-          <button
-            onClick={() => onOpenReceiveModal()}
-            className="brutal-btn brutal-btn-mint text-xs py-1.5 px-3"
+        {/* Clean Single Category Filter Dropdown */}
+        <div className="flex items-center gap-3">
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            aria-label="Filter by category"
+            className="px-3.5 py-2 text-xs font-bold rounded-xl border-2 border-[#18181B] bg-[#FAF9F5] text-[#18181B] focus:outline-none focus:bg-white cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" /> + Add / Receive Item
-          </button>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat === 'ALL' ? 'All Categories' : cat}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
-
-      {/* Category Filter Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-3 text-xs">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-3 py-1 font-bold rounded-lg border-2 border-[#18181B] whitespace-nowrap transition-all ${
-              selectedCategory === cat
-                ? 'bg-[#18181B] text-white shadow-[2px_2px_0px_#18181B]'
-                : 'bg-white text-[#18181B] hover:bg-[#F4F4F5]'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
       </div>
 
       {/* Table Container */}
@@ -121,6 +117,20 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                     {item.description && (
                       <div className="text-[11px] text-[#71717A]">
                         {item.description}
+                      </div>
+                    )}
+                    {(item.last_order_date || item.last_delivery_time) && (
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {item.last_order_date && (
+                          <span className="px-1.5 py-0.2 rounded bg-[#FEF9C3] border border-[#CA8A04] font-mono text-[9px] font-bold text-[#713F12]">
+                            Ord: {item.last_order_date.slice(0, 10)}
+                          </span>
+                        )}
+                        {item.last_delivery_time && (
+                          <span className="px-1.5 py-0.2 rounded bg-[#DCFCE7] border border-[#16A34A] font-mono text-[9px] font-bold text-[#166534]">
+                            Arr: {item.last_delivery_time.replace('T', ' ').slice(0, 16)}
+                          </span>
+                        )}
                       </div>
                     )}
                   </td>
@@ -182,8 +192,8 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-xs text-[#71717A] font-semibold">
-                  No components in inventory. Click "+ Add / Receive Item" to add your first part.
+                <td colSpan={6} className="py-10 px-4 text-center text-xs text-[#71717A] font-semibold">
+                  No components logged yet. Use <span className="font-black text-[#18181B]">Add Stock</span> or <span className="font-black text-[#18181B]">Upload Invoice</span> at the top to add parts.
                 </td>
               </tr>
             )}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-inventory-v2.0';
+const CACHE_NAME = 'smart-inventory-v2.2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

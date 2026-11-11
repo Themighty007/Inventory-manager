@@ -3,11 +3,13 @@ import {
   DrawerSummary,
   ItemResponse,
   TransactionResponse,
+  InvoiceSummaryResponse,
 } from './types/inventory';
 import {
   fetchDrawers,
   fetchItems,
   fetchTransactions,
+  fetchInvoices,
   checkServerHealth,
   syncBatchOperations,
 } from './api/client';
@@ -55,6 +57,7 @@ export const App: React.FC = () => {
   const [drawers, setDrawers] = useState<DrawerSummary[]>([]);
   const [items, setItems] = useState<ItemResponse[]>([]);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceSummaryResponse[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
@@ -143,15 +146,17 @@ export const App: React.FC = () => {
 
   const loadAllData = async () => {
     try {
-      const [d, it, tx] = await Promise.all([
+      const [d, it, tx, inv] = await Promise.all([
         fetchDrawers(),
         fetchItems(),
         fetchTransactions(),
+        fetchInvoices().catch(() => [] as InvoiceSummaryResponse[]),
       ]);
 
       setDrawers(d);
       setItems(it);
       setTransactions(tx);
+      setInvoices(inv);
       setIsOnline(true);
 
       // Save fresh copy to IndexedDB for offline resilience
@@ -292,6 +297,7 @@ export const App: React.FC = () => {
             drawers={drawers}
             items={items}
             transactions={transactions}
+            invoices={invoices}
             userName={userName}
             isOnline={isOnline}
             installPrompt={installPrompt}

@@ -2,7 +2,7 @@ import { DrawerSummary, ItemResponse } from '../types/inventory';
 
 export interface PendingOperation {
   client_op_id: string; // Unique UUID
-  action: 'RECEIVE' | 'CONSUME' | 'TRANSFER';
+  action: 'RECEIVE' | 'CONSUME' | 'TRANSFER' | 'INVOICE_COMMIT';
   payload: any;
   timestamp: string;
   status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
@@ -66,7 +66,7 @@ export function generateUUID(): string {
  * Queue a new pending operation in IndexedDB with unique UUID
  */
 export async function enqueueOperation(
-  action: 'RECEIVE' | 'CONSUME' | 'TRANSFER',
+  action: 'RECEIVE' | 'CONSUME' | 'TRANSFER' | 'INVOICE_COMMIT',
   payload: any
 ): Promise<PendingOperation> {
   const db = await openDb();

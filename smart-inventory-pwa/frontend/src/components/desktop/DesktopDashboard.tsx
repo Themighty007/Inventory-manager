@@ -3,13 +3,16 @@ import {
   DrawerSummary,
   ItemResponse,
   TransactionResponse,
+  InvoiceSummaryResponse,
 } from '../../types/inventory';
-import { clearDemoData, resetDemoData } from '../../api/client';
+import { fetchQrCode } from '../../api/client';
 import { StanleyCabinetVisualizer } from '../cabinet/StanleyCabinetVisualizer';
 import { DrawerModal } from '../cabinet/DrawerModal';
 import { InventoryTable } from '../inventory/InventoryTable';
 import { TransactionLedger } from '../inventory/TransactionLedger';
+import { InvoicesPanel } from '../inventory/InvoicesPanel';
 import { ParcelIntakeModal } from './ParcelIntakeModal';
+import { InvoiceUploadModal } from './InvoiceUploadModal';
 import { QrPrintModal } from '../qr/QrPrintModal';
 
 import {
@@ -20,8 +23,6 @@ import {
   History,
   QrCode,
   User,
-  Trash2,
-  RotateCcw,
   Plus,
   CheckCircle,
   Smartphone,
@@ -30,12 +31,15 @@ import {
   LayoutGrid,
   Edit2,
   Download,
+  FileText,
+  Upload,
 } from 'lucide-react';
 
 interface DesktopDashboardProps {
   drawers: DrawerSummary[];
   items: ItemResponse[];
   transactions: TransactionResponse[];
+  invoices: InvoiceSummaryResponse[];
   userName: string;
   isOnline: boolean;
   installPrompt: any;
@@ -49,6 +53,7 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
   drawers,
   items,
   transactions,
+  invoices,
   userName,
   isOnline,
   installPrompt,
@@ -57,47 +62,33 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
   onUpdateUserName,
   onInstallApp,
 }) => {
-  // Navigation: ALL, CABINET, INVENTORY, LEDGER
-  const [activeView, setActiveView] = useState<'ALL' | 'CABINET' | 'INVENTORY' | 'LEDGER'>('ALL');
+  // Navigation: ALL, CABINET, INVENTORY, INVOICES, LEDGER
+  const [activeView, setActiveView] = useState<'ALL' | 'CABINET' | 'INVENTORY' | 'INVOICES' | 'LEDGER'>('ALL');
   const [globalSearch, setGlobalSearch] = useState('');
 
   // Modals
   const [selectedDrawerId, setSelectedDrawerId] = useState<string | null>(null);
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
+  const [isInvoiceUploadOpen, setIsInvoiceUploadOpen] = useState(false);
   const [intakeSku, setIntakeSku] = useState<string | undefined>();
   const [intakeDrawer, setIntakeDrawer] = useState<string>('S01');
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+  const [mobileQrUri, setMobileQrUri] = useState<string | null>(null);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [tempName, setTempName] = useState(userName);
 
-  const handleClearDemo = async () => {
-    if (
-      window.confirm(
-        'Are you sure you want to clear all demo data? This resets the cabinet to 100% fresh and clean for actual production use.'
-      )
-    ) {
-      try {
-        const res = await clearDemoData();
-        onNotice(res.message);
-        onRefresh();
-      } catch (err: any) {
-        alert(err.message);
-      }
-    }
-  };
+  const lanIp = '192.168.29.243';
+  const mobileHttpsUrl = `https://${lanIp}:8443`;
+  const mobileHttpUrl = `http://${lanIp}:8000`;
 
-  const handleResetDemo = async () => {
-    if (window.confirm('Reload sample demo components for testing?')) {
-      try {
-        const res = await resetDemoData();
-        onNotice(res.message);
-        onRefresh();
-      } catch (err: any) {
-        alert(err.message);
-      }
+  React.useEffect(() => {
+    if (isMobileModalOpen && !mobileQrUri) {
+      fetchQrCode(mobileHttpsUrl)
+        .then((res) => setMobileQrUri(res.data_uri))
+        .catch((err) => console.warn('Failed to load mobile QR:', err));
     }
-  };
+  }, [isMobileModalOpen, mobileQrUri, mobileHttpsUrl]);
 
   const handleOpenReceive = (sku?: string, drawer?: string) => {
     setIntakeSku(sku);
@@ -116,10 +107,6 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
   const totalOccupied = drawers.filter((d) => d.is_occupied).length;
   const totalAvailable = 39 - totalOccupied;
   const totalUnits = drawers.reduce((sum, d) => sum + d.total_units, 0);
-
-  const lanIp = '192.168.29.243';
-  const mobileHttpsUrl = `https://${lanIp}:8443`;
-  const mobileHttpUrl = `http://${lanIp}:8000`;
 
   return (
     <div className="app-layout">
@@ -142,20 +129,8 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
             </div>
           </div>
 
-          {/* Sidebar Search */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-[#71717A] absolute left-3 top-3" />
-            <input
-              type="text"
-              placeholder="Search items or drawers..."
-              value={globalSearch}
-              onChange={(e) => setGlobalSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs font-semibold rounded-xl bg-[#23252B] border-2 border-[#3F3F46] text-white placeholder-[#71717A] focus:outline-none focus:border-[#86EFAC]"
-            />
-          </div>
-
           {/* Navigation Views */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2 pt-2">
             <div className="text-[10px] font-black tracking-widest uppercase text-[#71717A] px-2 mb-1">
               NAVIGATION
             </div>
@@ -170,7 +145,7 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4 shrink-0" />
                 <span>All Overview</span>
               </div>
             </button>
@@ -185,7 +160,7 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                <Layers className="w-4 h-4" />
+                <Layers className="w-4 h-4 shrink-0" />
                 <span>Cabinet</span>
               </div>
               <span className="font-mono text-[11px] font-bold">39</span>
@@ -201,10 +176,26 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                <Package className="w-4 h-4" />
+                <Package className="w-4 h-4 shrink-0" />
                 <span>Inventory List</span>
               </div>
               <span className="font-mono text-[11px]">{items.length}</span>
+            </button>
+
+            {/* Invoices & Arrivals */}
+            <button
+              onClick={() => setActiveView('INVOICES')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                activeView === 'INVOICES'
+                  ? 'bg-[#FEF08A] text-[#121316] border-2 border-[#18181B] shadow-[2px_2px_0px_#18181B]'
+                  : 'text-[#D4D4D8] hover:bg-[#27272A]'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 shrink-0" />
+                <span>Invoices</span>
+              </div>
+              <span className="font-mono text-[11px]">{invoices.length}</span>
             </button>
 
             {/* Transaction Ledger */}
@@ -217,8 +208,8 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
               }`}
             >
               <div className="flex items-center gap-3">
-                <History className="w-4 h-4" />
-                <span>Transaction History</span>
+                <History className="w-4 h-4 shrink-0" />
+                <span>History</span>
               </div>
               <span className="font-mono text-[11px]">{transactions.length}</span>
             </button>
@@ -290,50 +281,41 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Single Clean Global Search Bar */}
+            <div className="flex items-center gap-2.5 bg-white border-2 border-[#18181B] rounded-xl px-3.5 py-2 w-64 sm:w-72 shadow-[2px_2px_0px_#18181B] focus-within:bg-[#FFFBEB]">
+              <Search className="w-4 h-4 text-[#71717A] shrink-0" />
+              <input
+                type="text"
+                placeholder="Search SKU, invoice, or drawer..."
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                className="w-full text-xs font-semibold bg-transparent text-[#18181B] placeholder-[#71717A] focus:outline-none"
+              />
+              {globalSearch && (
+                <button
+                  type="button"
+                  onClick={() => setGlobalSearch('')}
+                  className="text-[#71717A] hover:text-[#18181B] shrink-0"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => setIsInvoiceUploadOpen(true)}
+              className="brutal-btn brutal-btn-yellow text-xs py-2 px-4 text-[#713F12]"
+            >
+              <Upload className="w-4 h-4 shrink-0" /> Upload Invoice
+            </button>
+
             <button
               onClick={() => handleOpenReceive()}
               className="brutal-btn brutal-btn-mint text-xs py-2 px-4 text-[#064E3B]"
             >
-              <Plus className="w-4 h-4" /> + Add / Receive Item
-            </button>
-
-            {/* Mobile PWA Shortcut */}
-            <button
-              onClick={() => setIsMobileModalOpen(true)}
-              className="brutal-btn brutal-btn-white text-xs py-2 px-3 text-[#18181B]"
-            >
-              <Smartphone className="w-3.5 h-3.5" /> Mobile Link
-            </button>
-
-            {/* Demo Data Management */}
-            {items.length > 0 ? (
-              <button
-                onClick={handleClearDemo}
-                className="brutal-btn brutal-btn-white text-xs py-2 px-3 text-[#B91C1C] border-[#B91C1C]/40 hover:bg-[#FEE2E2]"
-                title="Wipe demo data for fresh production use"
-              >
-                <Trash2 className="w-3.5 h-3.5" /> Clear Demo Data
-              </button>
-            ) : (
-              <button
-                onClick={handleResetDemo}
-                className="brutal-btn brutal-btn-yellow text-xs py-2 px-3 text-[#713F12]"
-                title="Load sample components for testing"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Load Demo Data
-              </button>
-            )}
-
-            {/* User Chip */}
-            <button
-              onClick={() => {
-                setTempName(userName);
-                setIsNameModalOpen(true);
-              }}
-              className="brutal-pill pill-yellow text-xs px-3 py-1.5 font-bold cursor-pointer"
-            >
-              <User className="w-3 h-3" /> {userName}
+              <Plus className="w-4 h-4 shrink-0" /> Add Stock
             </button>
           </div>
         </header>
@@ -399,14 +381,25 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
           {(activeView === 'ALL' || activeView === 'INVENTORY') && (
             <InventoryTable
               items={items}
+              searchQuery={globalSearch}
               onOpenReceiveModal={(sku) => handleOpenReceive(sku)}
+              onOpenDrawerModal={(drawerId) => setSelectedDrawerId(drawerId)}
+            />
+          )}
+
+          {/* Invoices & Arrivals Panel */}
+          {(activeView === 'ALL' || activeView === 'INVOICES') && (
+            <InvoicesPanel
+              invoices={invoices}
+              searchQuery={globalSearch}
+              onOpenInvoiceUpload={() => setIsInvoiceUploadOpen(true)}
               onOpenDrawerModal={(drawerId) => setSelectedDrawerId(drawerId)}
             />
           )}
 
           {/* Transaction Ledger Table */}
           {(activeView === 'ALL' || activeView === 'LEDGER') && (
-            <TransactionLedger transactions={transactions} />
+            <TransactionLedger transactions={transactions} searchQuery={globalSearch} />
           )}
         </main>
       </div>
@@ -422,6 +415,15 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
         onPrintQrForDrawer={() => setIsQrModalOpen(true)}
       />
 
+      {/* 1b. Invoice Upload & Extraction Modal */}
+      <InvoiceUploadModal
+        isOpen={isInvoiceUploadOpen}
+        drawers={drawers}
+        onClose={() => setIsInvoiceUploadOpen(false)}
+        onRefresh={onRefresh}
+        onNotice={onNotice}
+      />
+
       {/* 2. Parcel & SKU Intake Modal */}
       <ParcelIntakeModal
         isOpen={isIntakeOpen}
@@ -429,6 +431,7 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
         defaultDrawer={intakeDrawer}
         onClose={() => setIsIntakeOpen(false)}
         onRefresh={onRefresh}
+        onSwitchToInvoiceUpload={() => setIsInvoiceUploadOpen(true)}
       />
 
       {/* 3. Printable QR Labels Sheet */}
@@ -467,6 +470,29 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
             </div>
 
             <div className="space-y-4">
+              {/* Live QR Code Box */}
+              <div className="p-4 bg-white border-2 border-[#18181B] rounded-xl shadow-[2px_2px_0px_#18181B] flex flex-col items-center justify-center text-center">
+                <div className="w-44 h-44 p-2 bg-[#FAF9F5] border-2 border-[#18181B] rounded-xl flex items-center justify-center mb-2 shadow-inner">
+                  {mobileQrUri ? (
+                    <img
+                      src={mobileQrUri}
+                      alt="Scan to open on Mobile"
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <div className="text-xs font-mono font-bold text-[#71717A] animate-pulse">
+                      Generating QR...
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs font-black text-[#18181B]">
+                  Point phone camera at this QR code
+                </div>
+                <div className="text-[10px] text-[#71717A] font-semibold">
+                  Instantly opens the Mobile PWA in your browser
+                </div>
+              </div>
+
               <div className="p-4 rounded-xl border-2 border-[#18181B] bg-[#DCFCE7] shadow-[2px_2px_0px_#18181B]">
                 <div className="text-xs font-black uppercase text-[#15803D] mb-1">
                   1. Secure HTTPS Link (Camera & PWA Enabled)

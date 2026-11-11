@@ -9,6 +9,10 @@ import {
   StockConsumePayload,
   StockTransferPayload,
   SyncBatchResult,
+  ParsedInvoiceResponse,
+  InvoiceCommitPayload,
+  InvoiceCommitResult,
+  InvoiceSummaryResponse,
 } from '../types/inventory';
 
 // Dynamic Base URL resolving to the host that served the PWA (HTTP or HTTPS)
@@ -144,6 +148,12 @@ export async function fetchDrawerLabels(): Promise<DrawerLabelQr[]> {
   return res.json();
 }
 
+export async function fetchQrCode(code: string): Promise<{ code: string; data_uri: string }> {
+  const res = await fetch(`${BASE_URL}/api/qr/code?code=${encodeURIComponent(code)}`);
+  if (!res.ok) throw new Error('Failed to fetch QR code');
+  return res.json();
+}
+
 export async function syncBatchOperations(operations: any[]): Promise<SyncBatchResult> {
   const res = await fetch(`${BASE_URL}/api/sync/batch`, {
     method: 'POST',
@@ -157,14 +167,56 @@ export async function syncBatchOperations(operations: any[]): Promise<SyncBatchR
   return res.json();
 }
 
-export async function clearDemoData() {
-  const res = await fetch(`${BASE_URL}/api/admin/clear-demo-data`, { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to clear demo data');
+export async function parseInvoiceFile(file: File): Promise<ParsedInvoiceResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${BASE_URL}/api/invoices/parse`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    let detail = 'Failed to parse uploaded invoice document';
+    try {
+      const err = await res.json();
+      detail = err.detail || detail;
+    } catch {
+      // keep fallback detail
+    }
+    throw new Error(detail);
+  }
   return res.json();
 }
 
-export async function resetDemoData() {
-  const res = await fetch(`${BASE_URL}/api/admin/reset-demo-data`, { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to reset demo data');
+export async function commitInvoice(payload: InvoiceCommitPayload): Promise<InvoiceCommitResult> {
+  const res = await fetch(`${BASE_URL}/api/invoices/commit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let detail = 'Failed to commit invoice items';
+    try {
+      const err = await res.json();
+      detail = err.detail || detail;
+    } catch {
+      // keep fallback detail
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+export async function fetchInvoices(query?: string): Promise<InvoiceSummaryResponse[]> {
+  const params = new URLSearchParams();
+  if (query && query.trim()) params.append('q', query.trim());
+  const url = `${BASE_URL}/api/invoices${params.toString() ? `?${params.toString()}` : ''}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch logged invoices');
+  return res.json();
+}
+
+export async function fetchInvoiceDetail(invoiceId: number): Promise<InvoiceSummaryResponse> {
+  const res = await fetch(`${BASE_URL}/api/invoices/${invoiceId}`);
+  if (!res.ok) throw new Error('Failed to load invoice detail');
   return res.json();
 }

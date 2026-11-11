@@ -1,5 +1,5 @@
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from backend.app.database.connection import get_db
@@ -18,8 +18,12 @@ from backend.app.schemas.inventory import (
     SyncBatchRequest,
     SyncBatchResponse,
     DrawerLabelQr,
+    ParsedInvoiceResponse,
+    InvoiceCommitRequest,
+    InvoiceSummaryResponse,
 )
 from backend.app.services.inventory_service import InventoryService
+from backend.app.services.invoice_parser import parse_invoice_document
 from backend.app.database.models import Item
 
 api_router = APIRouter()
@@ -150,6 +154,71 @@ def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     return InventoryService.search(db, q)
 
 
+# ===================== INVOICE PARSE & COMMIT =====================
+@api_router.post(
+    "/invoices/parse",
+    response_model=ParsedInvoiceResponse,
+    summary="Upload and extract electronic components & dates from an invoice PDF, DOCX, CSV, TXT, or JSON",
+)
+async def parse_invoice_upload(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    filename = file.filename or "invoice.pdf"
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if len(content) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Uploaded file exceeds 25 MB limit.")
+    try:
+        return parse_invoice_document(content, filename, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Failed to parse invoice '{filename}': {str(e)}")
+
+
+@api_router.post(
+    "/invoices/commit",
+    summary="Commit reviewed invoice items with confirmed quantities & drawers atomically",
+)
+def commit_invoice_endpoint(
+    req: InvoiceCommitRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        return InventoryService.commit_invoice(db, req)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Invoice commit failed: {str(e)}")
+
+
+@api_router.get(
+    "/invoices",
+    response_model=List[InvoiceSummaryResponse],
+    summary="List logged invoices with order date, arrival time, and compartment assignments",
+)
+def get_invoices(
+    q: Optional[str] = Query(None),
+    limit: int = Query(100, le=500),
+    db: Session = Depends(get_db),
+):
+    return InventoryService.list_invoices(db, query=q, limit=limit)
+
+
+@api_router.get(
+    "/invoices/{invoice_id}",
+    response_model=InvoiceSummaryResponse,
+    summary="Get full breakdown for a logged invoice",
+)
+def get_invoice_detail(invoice_id: int, db: Session = Depends(get_db)):
+    try:
+        return InventoryService.get_invoice_detail(db, invoice_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 # ===================== QR CODES =====================
 @api_router.get("/qr/code", summary="Generate QR code data URI for any identifier")
 def get_qr_code(code: str = Query(..., description="String to encode, e.g. DRAWER:S12 or ITEM:MCB-63A-3P")):
@@ -178,62 +247,3 @@ def get_all_drawer_labels(db: Session = Depends(get_db)):
 @api_router.post("/sync/batch", response_model=SyncBatchResponse, summary="Batch synchronize queued offline operations with idempotency")
 def sync_batch(batch_req: SyncBatchRequest, db: Session = Depends(get_db)):
     return InventoryService.process_batch_sync(db, batch_req)
-
-
-# ===================== DEMO DATA MANAGEMENT =====================
-@api_router.post("/admin/clear-demo-data", summary="Wipe all demo items, lots, and transactions for fresh production use")
-def clear_demo_data(db: Session = Depends(get_db)):
-    try:
-        from backend.app.database.models import (
-            InventoryTransaction,
-            StockLocation,
-            StockLot,
-            InvoiceItem,
-            Invoice,
-            Parcel,
-            Item,
-            SyncQueue,
-        )
-        db.query(InventoryTransaction).delete()
-        db.query(StockLocation).delete()
-        db.query(StockLot).delete()
-        db.query(InvoiceItem).delete()
-        db.query(Invoice).delete()
-        db.query(Parcel).delete()
-        db.query(Item).delete()
-        db.query(SyncQueue).delete()
-        db.commit()
-        return {"status": "success", "message": "All demo data removed. Cabinet is 100% fresh and clean."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to clear demo data: {str(e)}")
-
-
-@api_router.post("/admin/reset-demo-data", summary="Reload sample demonstration components")
-def reset_demo_data(db: Session = Depends(get_db)):
-    try:
-        from backend.app.database.seed import seed_database
-        from backend.app.database.models import (
-            InventoryTransaction,
-            StockLocation,
-            StockLot,
-            InvoiceItem,
-            Invoice,
-            Parcel,
-            Item,
-            SyncQueue,
-        )
-        db.query(InventoryTransaction).delete()
-        db.query(StockLocation).delete()
-        db.query(StockLot).delete()
-        db.query(InvoiceItem).delete()
-        db.query(Invoice).delete()
-        db.query(Parcel).delete()
-        db.query(Item).delete()
-        db.query(SyncQueue).delete()
-        db.commit()
-        seed_database()
-        return {"status": "success", "message": "Demo data successfully reloaded."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to reset demo data: {str(e)}")
