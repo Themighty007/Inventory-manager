@@ -80,6 +80,8 @@ class StockLot(Base):
     received_quantity = Column(Integer, nullable=False)
     remaining_quantity = Column(Integer, nullable=False)
     unit_cost = Column(Float, nullable=False)
+    order_date = Column(DateTime, nullable=True)
+    delivery_arrival_time = Column(DateTime, nullable=True)
     received_at = Column(DateTime, default=datetime.utcnow)
 
     item = relationship("Item", back_populates="lots")
@@ -94,6 +96,8 @@ class Parcel(Base):
     invoice_number = Column(String(50), nullable=True)
     parcel_type = Column(String(50), default="INCOMING")
     status = Column(String(50), default="RECEIVED")
+    order_date = Column(DateTime, nullable=True)
+    delivery_arrival_time = Column(DateTime, nullable=True)
     received_at = Column(DateTime, default=datetime.utcnow)
     notes = Column(Text, nullable=True)
     drawer_id = Column(String(10), nullable=True)
@@ -106,12 +110,21 @@ class Invoice(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     invoice_number = Column(String(50), unique=True, index=True, nullable=False)
+    sale_order_number = Column(String(100), nullable=True)
     supplier = Column(String(100), nullable=False)
+    subtotal_amount = Column(Float, default=0.0)
+    tax_amount = Column(Float, default=0.0)
     total_amount = Column(Float, default=0.0)
+    currency = Column(String(10), default="INR")
+    order_date = Column(DateTime, nullable=True)
+    delivery_arrival_time = Column(DateTime, nullable=True)
     received_date = Column(DateTime, default=datetime.utcnow)
+    source_filename = Column(String(255), nullable=True)
+    notes = Column(Text, nullable=True)
     status = Column(String(50), default="PAID")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    items = relationship("InvoiceItem", back_populates="invoice")
+    items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
 
 
 class InvoiceItem(Base):
@@ -120,8 +133,14 @@ class InvoiceItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
     sku = Column(String(50), nullable=False)
+    item_name = Column(String(255), nullable=True)
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Float, nullable=False)
+    drawer_id = Column(String(10), nullable=True)
+    hsn_code = Column(String(30), nullable=True)
+    tax_rate = Column(Float, default=0.0)
+    line_total = Column(Float, default=0.0)
+    status = Column(String(30), default="LOGGED")
 
     invoice = relationship("Invoice", back_populates="items")
 
@@ -137,6 +156,8 @@ class InventoryTransaction(Base):
     balance_after = Column(Integer, nullable=False)
     reference_doc = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
+    order_date = Column(DateTime, nullable=True)
+    delivery_arrival_time = Column(DateTime, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
     item = relationship("Item", back_populates="transactions")

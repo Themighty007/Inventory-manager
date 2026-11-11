@@ -200,7 +200,9 @@ export const MobileSyncQueue: React.FC<MobileSyncQueueProps> = ({
               </div>
 
               <div className="text-xs font-mono font-bold text-[#18181B]">
-                {op.payload.item_sku || op.payload.sku} → Drawer {op.payload.drawer_id} ({op.payload.quantity} units)
+                {op.action === 'INVOICE_COMMIT'
+                  ? `Invoice ${op.payload.invoice_number} (${op.payload.items?.length || 0} components)`
+                  : `${op.payload.item_sku || op.payload.sku} → Drawer ${op.payload.drawer_id} (${op.payload.quantity} units)`}
               </div>
 
               <div className="flex items-center justify-between text-[10px] text-[#71717A] font-mono pt-1 border-t border-[#F4F4F5]">

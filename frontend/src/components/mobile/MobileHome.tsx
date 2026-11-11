@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DrawerSummary, ItemResponse } from '../../types/inventory';
 import { MobileScanner } from './MobileScanner';
 import { MobileParcelIntake } from './MobileParcelIntake';
+import { MobileInvoiceIntake } from './MobileInvoiceIntake';
 import { MobileCabinetView } from './MobileCabinetView';
 import { MobileSyncQueue } from './MobileSyncQueue';
 import {
@@ -14,6 +15,7 @@ import {
   Cpu,
   RefreshCw,
   Download,
+  FileText,
 } from 'lucide-react';
 
 interface MobileHomeProps {
@@ -39,7 +41,7 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
   onNotice,
   onInstallApp,
 }) => {
-  const [activeTab, setActiveTab] = useState<'CABINET' | 'SCANNER' | 'INTAKE' | 'QUEUE'>('CABINET');
+  const [activeTab, setActiveTab] = useState<'CABINET' | 'SCANNER' | 'INVOICE' | 'INTAKE' | 'QUEUE'>('CABINET');
   const [scannedCode, setScannedCode] = useState<string>('');
 
   const handleScanCompleted = (code: string) => {
@@ -144,6 +146,16 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
           />
         )}
 
+        {activeTab === 'INVOICE' && (
+          <MobileInvoiceIntake
+            drawers={drawers}
+            isOnline={isOnline}
+            userName={userName}
+            onCompleted={handleIntakeCompleted}
+            onSwitchToManual={() => setActiveTab('INTAKE')}
+          />
+        )}
+
         {activeTab === 'INTAKE' && (
           <MobileParcelIntake
             initialCode={scannedCode}
@@ -152,6 +164,7 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
             userName={userName}
             onCompleted={handleIntakeCompleted}
             onBack={() => setActiveTab('SCANNER')}
+            onSwitchToInvoice={() => setActiveTab('INVOICE')}
           />
         )}
 
@@ -165,10 +178,10 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
       </main>
 
       {/* Bottom PWA Tab Bar */}
-      <nav className="bg-white border-t-2 border-[#18181B] py-2 px-3 flex items-center justify-around text-[10px] font-bold shadow-[0_-2px_10px_rgba(0,0,0,0.06)] z-20">
+      <nav className="bg-white border-t-2 border-[#18181B] py-2 px-1.5 flex items-center justify-around text-[10px] font-bold shadow-[0_-2px_10px_rgba(0,0,0,0.06)] z-20">
         <button
           onClick={() => setActiveTab('CABINET')}
-          className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all ${
             activeTab === 'CABINET'
               ? 'text-[#713F12] bg-[#FEF08A] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
               : 'text-[#71717A]'
@@ -179,7 +192,7 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
 
         <button
           onClick={() => setActiveTab('SCANNER')}
-          className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all ${
             activeTab === 'SCANNER'
               ? 'text-[#064E3B] bg-[#86EFAC] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
               : 'text-[#71717A]'
@@ -189,11 +202,22 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
         </button>
 
         <button
+          onClick={() => setActiveTab('INVOICE')}
+          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all ${
+            activeTab === 'INVOICE'
+              ? 'text-[#713F12] bg-[#FDE047] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
+              : 'text-[#71717A]'
+          }`}
+        >
+          <FileText className="w-4 h-4" /> Invoice
+        </button>
+
+        <button
           onClick={() => {
             setScannedCode('');
             setActiveTab('INTAKE');
           }}
-          className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all ${
             activeTab === 'INTAKE'
               ? 'text-[#4C1D95] bg-[#DDD6FE] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
               : 'text-[#71717A]'
@@ -204,7 +228,7 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
 
         <button
           onClick={() => setActiveTab('QUEUE')}
-          className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all relative ${
+          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all relative ${
             activeTab === 'QUEUE'
               ? 'text-[#1E3A8A] bg-[#93C5FD] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
               : 'text-[#71717A]'
@@ -212,7 +236,7 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
         >
           <Database className="w-4 h-4" /> Queue
           {pendingCount > 0 && (
-            <span className="w-4 h-4 rounded-full bg-[#B91C1C] text-white text-[9px] font-mono flex items-center justify-center border border-white absolute -top-1 right-1">
+            <span className="w-4 h-4 rounded-full bg-[#B91C1C] text-white text-[9px] font-mono flex items-center justify-center border border-white absolute -top-1 right-0.5">
               {pendingCount}
             </span>
           )}

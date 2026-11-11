@@ -11,6 +11,7 @@ import {
   AlertCircle,
   ShieldCheck,
   Clock,
+  FileText,
 } from 'lucide-react';
 
 interface MobileParcelIntakeProps {
@@ -20,7 +21,16 @@ interface MobileParcelIntakeProps {
   userName: string;
   onCompleted: (message: string) => void;
   onBack: () => void;
+  onSwitchToInvoice?: () => void;
 }
+
+const getLocalDateTimeString = () => {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(
+    now.getHours()
+  )}:${pad(now.getMinutes())}`;
+};
 
 export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
   initialCode = '',
@@ -29,6 +39,7 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
   userName,
   onCompleted,
   onBack,
+  onSwitchToInvoice,
 }) => {
   const [trackingCode, setTrackingCode] = useState(initialCode);
   const [sku, setSku] = useState('');
@@ -39,6 +50,8 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
   const [drawerId, setDrawerId] = useState('');
   const [supplier, setSupplier] = useState('');
   const [invoice, setInvoice] = useState('');
+  const [orderDate, setOrderDate] = useState('');
+  const [deliveryTime, setDeliveryTime] = useState(getLocalDateTimeString());
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -138,6 +151,8 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
       invoice_number: invoice.trim() || undefined,
       drawer_id: drawerId.toUpperCase(),
       sub_tray: 'MAIN',
+      order_date: orderDate ? `${orderDate}T00:00:00` : null,
+      delivery_arrival_time: deliveryTime || getLocalDateTimeString(),
       notes: `Registered via mobile PWA by ${userName}. ${notes}`.trim(),
     };
 
@@ -197,6 +212,21 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
           {isOnline ? 'Live Master Connected' : 'Offline Queue Mode'}
         </span>
       </div>
+
+      {onSwitchToInvoice && (
+        <button
+          type="button"
+          onClick={onSwitchToInvoice}
+          className="mb-3 p-2.5 rounded-xl bg-[#FEF9C3] border-2 border-[#18181B] flex items-center justify-between gap-2 text-left"
+        >
+          <span className="text-[11px] font-bold text-[#713F12]">
+            Upload a PDF / Doc Invoice instead?
+          </span>
+          <span className="px-2 py-0.5 rounded-lg bg-[#18181B] text-[#FEF08A] text-[10px] font-black flex items-center gap-1 shrink-0">
+            <FileText className="w-3 h-3" /> Auto-Extract →
+          </span>
+        </button>
+      )}
 
       {/* Scanned Badge Banner */}
       {trackingCode && (
@@ -362,6 +392,24 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
                 onChange={(e) => setInvoice(e.target.value)}
                 placeholder="Bill / Invoice ref..."
                 className="w-full p-2.5 text-xs font-mono rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-[#18181B] block mb-1">ORDER DATE</label>
+              <input
+                type="date"
+                value={orderDate}
+                onChange={(e) => setOrderDate(e.target.value)}
+                className="w-full p-2.5 text-xs font-mono font-bold rounded-lg border-2 border-[#18181B] bg-[#FEF9C3]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-[#18181B] block mb-1">ARRIVAL TIME</label>
+              <input
+                type="datetime-local"
+                value={deliveryTime}
+                onChange={(e) => setDeliveryTime(e.target.value)}
+                className="w-full p-2.5 text-[11px] font-mono font-bold rounded-lg border-2 border-[#18181B] bg-[#DCFCE7]"
               />
             </div>
           </div>

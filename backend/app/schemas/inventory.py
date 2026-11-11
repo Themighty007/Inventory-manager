@@ -79,6 +79,8 @@ class ItemResponse(ItemBase):
     id: int
     total_available: int
     is_low_stock: bool
+    last_order_date: Optional[datetime] = None
+    last_delivery_time: Optional[datetime] = None
     locations: List[ItemLocation] = []
 
     class Config:
@@ -99,6 +101,8 @@ class StockReceiveRequest(BaseModel):
     invoice_number: Optional[str] = None
     drawer_id: str = Field(description="Target Stanley drawer, e.g. 'S01' or 'L02'")
     sub_tray: str = "MAIN"
+    order_date: Optional[datetime] = None
+    delivery_arrival_time: Optional[datetime] = None
     notes: Optional[str] = None
 
 
@@ -144,12 +148,15 @@ class DashboardStats(BaseModel):
 class TransactionResponse(BaseModel):
     id: int
     item_sku: str
+    item_name: Optional[str] = None
     drawer_id: Optional[str]
     action_type: str
     change_qty: int
     balance_after: int
     reference_doc: Optional[str]
     notes: Optional[str]
+    order_date: Optional[datetime] = None
+    delivery_arrival_time: Optional[datetime] = None
     timestamp: datetime
 
     class Config:
@@ -182,3 +189,117 @@ class DrawerLabelQr(BaseModel):
     dimensions: str
     code: str
     qr_data_uri: str
+
+
+# ===================== INVOICE PARSING & COMMIT =====================
+class ParsedInvoiceItem(BaseModel):
+    line_no: int
+    sku: str
+    name: str
+    category: str = "General"
+    quantity: int = 1
+    raw_quantity: float = 1.0
+    unit: str = "pcs"
+    unit_price: float = 0.0
+    effective_unit_cost: float = 0.0
+    tax_rate: float = 0.0
+    line_total: float = 0.0
+    hsn_code: Optional[str] = None
+    is_shipping_or_fee: bool = False
+    suggested_drawer_id: Optional[str] = None
+    existing_drawers: List[str] = []
+    existing_item_name: Optional[str] = None
+    confidence: str = "HIGH"
+
+
+class ParsedInvoiceResponse(BaseModel):
+    filename: str
+    file_type: str
+    supplier: str
+    invoice_number: str
+    sale_order_number: Optional[str] = None
+    order_date: Optional[str] = None  # YYYY-MM-DD
+    invoice_date_raw: Optional[str] = None
+    delivery_arrival_time: str  # ISO YYYY-MM-DDTHH:MM
+    delivery_extracted_from_doc: bool = False
+    currency: str = "INR"
+    subtotal_amount: float = 0.0
+    tax_amount: float = 0.0
+    total_amount: float = 0.0
+    extracted_total_qty: Optional[float] = None
+    already_logged: bool = False
+    existing_invoice_id: Optional[int] = None
+    warnings: List[str] = []
+    items: List[ParsedInvoiceItem] = []
+    skipped_fee_rows: List[ParsedInvoiceItem] = []
+    raw_text_preview: str = ""
+
+
+class InvoiceCommitItem(BaseModel):
+    sku: str
+    name: str
+    category: str = "General"
+    quantity: int = Field(gt=0)
+    unit: str = "pcs"
+    unit_price: float = 0.0
+    drawer_id: str
+    sub_tray: str = "MAIN"
+    hsn_code: Optional[str] = None
+    tax_rate: float = 0.0
+    line_total: float = 0.0
+    notes: Optional[str] = None
+
+
+class InvoiceCommitRequest(BaseModel):
+    invoice_number: str
+    sale_order_number: Optional[str] = None
+    supplier: str
+    order_date: Optional[datetime] = None
+    delivery_arrival_time: Optional[datetime] = None
+    currency: str = "INR"
+    subtotal_amount: float = 0.0
+    tax_amount: float = 0.0
+    total_amount: float = 0.0
+    source_filename: Optional[str] = None
+    notes: Optional[str] = None
+    allow_duplicate_append: bool = False
+    items: List[InvoiceCommitItem]
+
+
+class InvoiceItemDetailResponse(BaseModel):
+    id: int
+    sku: str
+    item_name: Optional[str] = None
+    quantity: int
+    unit_price: float
+    drawer_id: Optional[str] = None
+    hsn_code: Optional[str] = None
+    tax_rate: float = 0.0
+    line_total: float = 0.0
+    status: str = "LOGGED"
+
+    class Config:
+        from_attributes = True
+
+
+class InvoiceSummaryResponse(BaseModel):
+    id: int
+    invoice_number: str
+    sale_order_number: Optional[str] = None
+    supplier: str
+    subtotal_amount: float = 0.0
+    tax_amount: float = 0.0
+    total_amount: float = 0.0
+    currency: str = "INR"
+    order_date: Optional[datetime] = None
+    delivery_arrival_time: Optional[datetime] = None
+    received_date: datetime
+    source_filename: Optional[str] = None
+    status: str
+    items_count: int
+    total_units: int
+    drawers_used: List[str] = []
+    items: List[InvoiceItemDetailResponse] = []
+
+    class Config:
+        from_attributes = True

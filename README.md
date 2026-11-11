@@ -2,7 +2,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
-[![React 19](https://img.shields.io/badge/Frontend-React%2019-61DAFB.svg?logo=react)](https://react.dev)
+[![React 18](https://img.shields.io/badge/Frontend-React%2018-61DAFB.svg?logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6.svg?logo=typescript)](https://www.typescriptlang.org)
 [![PWA](https://img.shields.io/badge/PWA-Installable-5A0FC8.svg?logo=pwa)](https://web.dev/progressive-web-apps/)
 [![SQLite](https://img.shields.io/badge/Database-SQLite%20WAL-003B57.svg?logo=sqlite)](https://www.sqlite.org)
@@ -13,52 +13,51 @@ Engineered as a single, responsive **Progressive Web App (PWA)** that runs on Wi
 
 ---
 
-## 📸 Core Features & Highlights
+## Core Features & Highlights
 
 ### 1. Dual-Experience Responsive Design
 - **Windows Desktop Experience**:
-  - Full interactive **Stanley 1-93-981 39-Compartment Matrix** visualizer (30 small drawers: `S01–S30`, 9 large drawers: `L01–L09`).
-  - Searchable inventory table with category filtering (`Electrical`, `Network`, `HVAC`, `Microcontrollers`, `Passives`, `Sensors`).
-  - Auditable transaction ledger tracking every intake, deduction, and transfer.
+  - Full interactive **Stanley 1-93-981 39-Compartment Matrix** visualizer (`S01–S30` small drawers and `L01–L09` large drawers).
+  - Clean unified search bar (`Search SKU, invoice, or drawer...`) and category dropdown filter (`Electrical`, `Network`, `HVAC`, `Microcontrollers`, `Passives`, `Sensors`, etc.).
+  - **Invoice Document Auto-Logger**: Upload supplier invoices (`.pdf`, `.docx`, `.csv`, `.tsv`, `.txt`, `.json`) to automatically extract item **Name**, **SKU**, **Quantity**, **Order Date**, and **Delivery / Arrival Time**. Confirm quantities, assign each component to its Stanley drawer, and commit atomically.
+  - **Logged Invoices & Arrivals** panel and an auditable **Transaction Ledger** tracking every intake, deduction, and transfer.
   - Printable 39-compartment QR label sheet modal for drawer stickers.
-  - One-click demo data controls: **Load Demo Data** for instant testing, and **Clear Demo Data** for a pristine zero-state setup.
 - **Android Mobile Experience**:
-  - In-browser barcode & QR camera scanner powered by `html5-qrcode` with rear camera selection, flash/torch toggle, photo upload fallback, and manual entry.
+  - High-precision in-browser QR & 1D barcode camera scanner (native `BarcodeDetector` + `jsQR` engine with tap-to-focus, center-crop sensor precision, rear camera selection, flash/torch toggle, photo upload fallback, and manual entry).
+  - **Mobile Invoice Tab**: Upload downloaded PDF/DOCX/CSV invoices directly from your phone, confirm quantities, tap Stanley compartments (`S01–L09`), and commit to the master database.
   - Touch-friendly 39-drawer grid with drawer detail bottom sheet, quantity stepper, and quick deduction.
-  - Parcel intake wizard populating parts and assigning drawers directly from scanned tracking or component codes.
-  - Full **PWA Installation**: Install directly from Chrome to your phone's home screen for a full-screen, native-app feel without needing an APK.
+  - Full **PWA Installation**: Install directly from Chrome to your phone's home screen without needing an APK.
 
 ### 2. Physical Stanley Cabinet Layout
-- **Upper Section**: 30 Small Drawers (`S01` to `S30`), dimensions $13.5 \times 5.0 \times 3.5\text{ cm}$.
-- **Lower Section**: 9 Large Drawers (`L01` to `L09`), dimensions $13.5 \times 11.0 \times 6.0\text{ cm}$.
-- Live occupancy indicators (Green = Available / Empty, Yellow = In-Use, Red = Low Stock Alert).
+- **Upper Section**: 30 Small Drawers (`S01` to `S30`), dimensions `13.5 x 5.0 x 3.5 cm`.
+- **Lower Section**: 9 Large Drawers (`L01` to `L09`), dimensions `13.5 x 11.0 x 6.0 cm`.
+- Live occupancy indicators (`OCCUPIED`, `EMPTY`, and `ALL` filters).
 
 ### 3. Offline Resilience & Idempotency
-- Works seamlessly even if Wi-Fi drops: All transactions queue in **IndexedDB** (`StanleyInventoryOfflineDB`).
-- Each pending operation is assigned a cryptographically secure UUID (`client_op_id`).
-- When connectivity returns, operations auto-sync to `/api/sync/batch`.
-- The SQLite backend records processed UUIDs in the `sync_queue` table to guarantee **strict idempotency** (zero risk of duplicate entries or double deductions).
+- Works seamlessly even if Wi-Fi drops: transactions queue locally in **IndexedDB** (`StanleyInventoryOfflineDB`).
+- Each pending operation receives a cryptographically unique UUID (`client_op_id`).
+- When connectivity returns, operations sync automatically to `/api/sync/batch`, and the SQLite backend checks processed UUIDs in `sync_queue` to guarantee **strict idempotency** with zero duplicate transactions.
 
 ---
 
-## 🚀 Quick Start (Running Independently)
+## Quick Start (Running Independently)
 
 ### Option A: 1-Click Launch (Windows)
-Simply double-click:
+Double-click:
 ```cmd
 start.bat
 ```
 `start.bat` will:
 1. Verify Python is installed.
 2. Automatically install all required dependencies from `requirements.txt`.
-3. Launch the dual HTTP & HTTPS server.
+3. Launch the dual HTTP (`8000`) & HTTPS (`8443`) server.
 4. Automatically open `http://localhost:8000` in your default browser.
 
 ---
 
 ### Option B: Manual Command Line Launch
 1. Ensure Python 3.10+ is installed.
-2. Install the lightweight Python dependencies:
+2. Install the Python dependencies:
    ```bash
    pip install -r requirements.txt
    ```
@@ -73,78 +72,87 @@ The server automatically detects your local Wi-Fi IP and outputs:
 - **Android Mobile (LAN HTTPS)**: `https://<your-local-ip>:8443`
 - **Interactive REST API Docs**: `http://localhost:8000/docs`
 
-> **Note**: You **do NOT need Node.js or npm installed to run the app**! The React frontend is already pre-compiled into production assets inside `frontend/dist/` and served directly by FastAPI.
+> **Note**: You **do NOT need Node.js or npm installed to run the app**. The React + TypeScript frontend is pre-compiled inside `frontend/dist/` and served directly by FastAPI.
 
 ---
 
-## 📱 Connecting Your Android Phone
+## Connecting Your Android Phone
 
-1. Connect your Android phone to the **same Wi-Fi network** as your computer.
+1. Connect your Android phone to the **same Wi-Fi network** as your Windows PC.
 2. Open **Google Chrome** on your phone and navigate to:
    ```
    https://<your-laptop-ip>:8443
    ```
    *(e.g., `https://192.168.29.243:8443`)*
-3. **Bypass Local SSL Warning**:
-   - Because the SSL certificate is self-signed for local LAN use, Chrome will display: *"Your connection is not private"*.
+3. **Accept Local SSL Certificate**:
+   - Because the LAN SSL certificate is self-signed, Chrome displays *"Your connection is not private"*.
    - Tap **Advanced**, then tap **Proceed to site (unsafe)**.
-   *(HTTPS is strictly required by modern mobile browsers to enable camera permissions and PWA installation).*
+   *(HTTPS is required by Android Chrome for camera access and PWA installation).*
 4. **Install as App (PWA)**:
-   - Tap the three dots (⋮) in Chrome $\rightarrow$ Tap **"Add to Home screen"** or **"Install app"**.
-   - An app icon named **Inventory** will appear on your home screen.
-5. **Camera Scanning**:
-   - Tap the **Scanner** tab $\rightarrow$ Grant camera access $\rightarrow$ Point at any component barcode or drawer QR code!
+   - Tap Chrome's menu (`⋮`) -> **"Add to Home screen"** or **"Install app"**.
+5. **Camera Scanning & Invoices**:
+   - Use the **Scanner** tab to scan QR/barcodes or tap the **Invoice** tab to upload supplier PDF/DOCX/CSV invoices directly from your phone.
 
 ---
 
-## 🗄️ Database & Demo Data Management
+## Database Storage
 
-The system uses a standalone SQLite database stored at:
+The application initializes cleanly with all **39 Stanley compartments (`S01–S30`, `L01–L09`)** and zero pre-loaded demo data. All production records are persisted in:
 ```
 inventory_master.db
 ```
-- **Clear Demo Data**: Click the red *"Clear Demo Data"* button on the desktop header to wipe demo parts for real production usage.
-- **Load Demo Data**: Click *"Load Demo Data"* to reload sample components (ESP32, Arduino Nano, Resistors, Circuit Breakers, Ethernet spools) for demonstration or testing.
 
 ---
 
-## 📦 Repository Structure
+## Repository Structure
 
 ```
 ├── backend/
 │   └── app/
-│       ├── api/router.py          # REST API endpoints & sync route
-│       ├── database/              # SQLAlchemy models, SQLite connection, seed
+│       ├── api/router.py                    # REST API endpoints, invoice parsing & sync route
+│       ├── database/                        # SQLAlchemy models, SQLite WAL engine & migrations
 │       │   ├── connection.py
 │       │   ├── models.py
 │       │   └── seed.py
-│       ├── schemas/inventory.py   # Pydantic request & response schemas
-│       ├── services/              # Inventory business logic & QR generator
-│       ├── config.py              # Server settings & network configurations
-│       └── main.py                # FastAPI app & SPA static asset mount
-├── certs/                         # Self-signed TLS/SSL SAN certificates
+│       ├── schemas/inventory.py             # Pydantic request & response schemas
+│       ├── services/
+│       │   ├── inventory_service.py         # Core inventory, stock & atomic invoice logging
+│       │   └── invoice_parser.py            # Spatial PDF, DOCX, CSV, TXT & JSON invoice extractor
+│       ├── config.py                        # Server settings & LAN network configs
+│       └── main.py                          # FastAPI app & SPA static asset mount
+├── certs/                                   # Self-signed TLS/SSL SAN certificates
 │   ├── cert.pem
 │   └── key.pem
-├── frontend/                      # React + TypeScript + Vite + Tailwind source
-│   ├── dist/                      # Pre-compiled production bundle (served by FastAPI)
-│   ├── public/                    # PWA Web App Manifest, Service Worker, icons
-│   ├── src/                       # TypeScript source code
+├── frontend/                                # React + TypeScript + Vite + Tailwind v4 source
+│   ├── dist/                                # Pre-compiled production bundle served by FastAPI
+│   ├── public/                              # PWA Web App Manifest, Service Worker, icons
+│   ├── src/
+│   │   ├── api/client.ts                    # Typed API client
+│   │   ├── components/
+│   │   │   ├── cabinet/                     # Stanley 39-drawer visualizer & drawer modal
+│   │   │   ├── desktop/                     # Desktop dashboard, parcel intake & invoice modal
+│   │   │   ├── inventory/                   # Inventory table, logged invoices & ledger
+│   │   │   ├── mobile/                      # Mobile cabinet, scanner, invoice & intake views
+│   │   │   └── qr/                          # Printable drawer QR sheet
+│   │   ├── db/offlineDb.ts                  # IndexedDB offline operations queue
+│   │   ├── App.tsx
+│   │   └── index.css
 │   ├── package.json
 │   └── vite.config.ts
-├── inventory_master.db            # Master SQLite database (WAL mode)
-├── generate_ssl.ps1               # SSL certificate generator script
-├── requirements.txt               # Exact Python dependencies
-├── run_server.py                  # Concurrent dual HTTP (8000) & HTTPS (8443) server
-├── start.bat                      # 1-Click launcher for Windows
-├── LICENSE                        # MIT License
-└── README.md                      # Project documentation
+├── inventory_master.db                      # Master SQLite database (WAL mode)
+├── generate_ssl.ps1                         # Optional SSL certificate regenerator script
+├── requirements.txt                         # Python backend dependencies
+├── run_server.py                            # Concurrent dual HTTP (8000) & HTTPS (8443) server
+├── start.bat                                # 1-Click launcher for Windows
+├── LICENSE                                  # Apache License 2.0
+└── README.md                                # Project documentation
 ```
 
 ---
 
-## 🛠️ Modifying Frontend Source (Optional)
+## Modifying Frontend Source (Optional)
 
-If you wish to edit the frontend TypeScript source code:
+If you want to customize the React + TypeScript UI:
 ```bash
 cd frontend
 npm install
@@ -154,5 +162,5 @@ npm run build   # Rebuilds production bundle into frontend/dist/
 
 ---
 
-## 📄 License
+## License
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.

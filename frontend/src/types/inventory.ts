@@ -52,6 +52,8 @@ export interface ItemResponse {
   datasheet_url?: string;
   total_available: number;
   is_low_stock: boolean;
+  last_order_date?: string | null;
+  last_delivery_time?: string | null;
   locations: ItemLocation[];
 }
 
@@ -68,6 +70,8 @@ export interface StockReceivePayload {
   invoice_number?: string;
   drawer_id: string;
   sub_tray?: string;
+  order_date?: string | null;
+  delivery_arrival_time?: string | null;
   notes?: string;
 }
 
@@ -105,12 +109,15 @@ export interface DashboardStats {
 export interface TransactionResponse {
   id: number;
   item_sku: string;
+  item_name?: string | null;
   drawer_id?: string;
   action_type: 'RECEIVE' | 'CONSUME' | 'TRANSFER' | 'AUDIT_ADJUST';
   change_qty: number;
   balance_after: number;
   reference_doc?: string;
   notes?: string;
+  order_date?: string | null;
+  delivery_arrival_time?: string | null;
   timestamp: string;
 }
 
@@ -125,7 +132,7 @@ export interface DrawerLabelQr {
 
 export interface SyncOperationItem {
   client_op_id: string;
-  action: 'RECEIVE' | 'CONSUME' | 'TRANSFER';
+  action: 'RECEIVE' | 'CONSUME' | 'TRANSFER' | 'INVOICE_COMMIT';
   payload: any;
   timestamp?: string;
 }
@@ -140,4 +147,132 @@ export interface SyncBatchResult {
     message?: string;
     error?: string;
   }[];
+}
+
+export interface ParsedInvoiceItem {
+  line_no: number;
+  sku: string;
+  name: string;
+  category: string;
+  quantity: number;
+  raw_quantity: number;
+  unit: string;
+  unit_price: number;
+  effective_unit_cost: number;
+  tax_rate: number;
+  line_total: number;
+  hsn_code?: string | null;
+  is_shipping_or_fee: boolean;
+  suggested_drawer_id?: string | null;
+  existing_drawers: string[];
+  existing_item_name?: string | null;
+  confidence: string;
+}
+
+export interface ParsedInvoiceResponse {
+  filename: string;
+  file_type: string;
+  supplier: string;
+  invoice_number: string;
+  sale_order_number?: string | null;
+  order_date?: string | null;
+  invoice_date_raw?: string | null;
+  delivery_arrival_time: string;
+  delivery_extracted_from_doc: boolean;
+  currency: string;
+  subtotal_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  extracted_total_qty?: number | null;
+  already_logged: boolean;
+  existing_invoice_id?: number | null;
+  warnings: string[];
+  items: ParsedInvoiceItem[];
+  skipped_fee_rows: ParsedInvoiceItem[];
+  raw_text_preview: string;
+}
+
+export interface InvoiceCommitItemPayload {
+  sku: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  drawer_id: string;
+  sub_tray?: string;
+  hsn_code?: string | null;
+  tax_rate?: number;
+  line_total?: number;
+  notes?: string;
+}
+
+export interface InvoiceCommitPayload {
+  invoice_number: string;
+  sale_order_number?: string | null;
+  supplier: string;
+  order_date?: string | null;
+  delivery_arrival_time?: string | null;
+  currency?: string;
+  subtotal_amount?: number;
+  tax_amount?: number;
+  total_amount?: number;
+  source_filename?: string | null;
+  notes?: string;
+  allow_duplicate_append?: boolean;
+  items: InvoiceCommitItemPayload[];
+}
+
+export interface InvoiceCommitResult {
+  status: string;
+  message: string;
+  invoice_id: number;
+  invoice_number: string;
+  sale_order_number?: string | null;
+  supplier: string;
+  order_date?: string | null;
+  delivery_arrival_time?: string | null;
+  items_logged: number;
+  total_units: number;
+  drawers_used: string[];
+  results: {
+    sku: string;
+    name: string;
+    quantity: number;
+    drawer_id: string;
+    new_balance: number;
+  }[];
+}
+
+export interface InvoiceItemDetail {
+  id: number;
+  sku: string;
+  item_name?: string | null;
+  quantity: number;
+  unit_price: number;
+  drawer_id?: string | null;
+  hsn_code?: string | null;
+  tax_rate: number;
+  line_total: number;
+  status: string;
+}
+
+export interface InvoiceSummaryResponse {
+  id: number;
+  invoice_number: string;
+  sale_order_number?: string | null;
+  supplier: string;
+  subtotal_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  currency: string;
+  order_date?: string | null;
+  delivery_arrival_time?: string | null;
+  received_date: string;
+  source_filename?: string | null;
+  status: string;
+  items_count: number;
+  total_units: number;
+  drawers_used: string[];
+  items: InvoiceItemDetail[];
 }
