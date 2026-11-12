@@ -1,15 +1,29 @@
-# Smart Electronics Inventory & Cabinet Manager (PWA)
+# SKR Tech's Inventory System (PWA)
+**Hardware Innovations • Stanley 1-93-981 39-Compartment Storage System**
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
-[![React 18](https://img.shields.io/badge/Frontend-React%2018-61DAFB.svg?logo=react)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-00B4D8.svg?logo=fastapi)](https://fastapi.tiangolo.com)
+[![React 18](https://img.shields.io/badge/Frontend-React%2018-00B4D8.svg?logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6.svg?logo=typescript)](https://www.typescriptlang.org)
-[![PWA](https://img.shields.io/badge/PWA-Installable-5A0FC8.svg?logo=pwa)](https://web.dev/progressive-web-apps/)
-[![SQLite](https://img.shields.io/badge/Database-SQLite%20WAL-003B57.svg?logo=sqlite)](https://www.sqlite.org)
+[![PWA](https://img.shields.io/badge/PWA-Installable-2EC4B6.svg?logo=pwa)](https://web.dev/progressive-web-apps/)
+[![SQLite](https://img.shields.io/badge/Database-SQLite%20WAL-0B132B.svg?logo=sqlite)](https://www.sqlite.org)
 
 A complete, self-contained, and production-ready **Smart Electronics Inventory Management System** built around the physical **Stanley 1-93-981 39-Compartment Storage Cabinet**.
 
 Engineered as a single, responsive **Progressive Web App (PWA)** that runs on Windows desktop browsers and Android mobile browsers, backed by a local **FastAPI + SQLite** master database.
+
+Developed by **Gowthum Vijaay D** (`srigowv@gmail.com`).
+
+---
+
+## Brand Aesthetic & Color Palette
+
+Designed with a sleek, minimalist hardware engineering aesthetic:
+- **Primary Color**: Deep Hardware Navy (`#0B132B`)
+- **Accent Color 1**: Electric Circuit Cyan (`#00B4D8`)
+- **Accent Color 2**: Precision Metrology Teal (`#2EC4B6`)
+- **Neutral Light**: Clean Room White (`#F8FAFC`)
+- **Neutral Dark**: Anodized Charcoal (`#1E293B`)
+- **Typography**: Inter (Variable) for UI precision; Space Grotesk for display headers.
 
 ---
 
@@ -18,13 +32,16 @@ Engineered as a single, responsive **Progressive Web App (PWA)** that runs on Wi
 ### 1. Dual-Experience Responsive Design
 - **Windows Desktop Experience**:
   - Full interactive **Stanley 1-93-981 39-Compartment Matrix** visualizer (`S01–S30` small drawers and `L01–L09` large drawers).
-  - Clean unified search bar (`Search SKU, invoice, or drawer...`) and category dropdown filter (`Electrical`, `Network`, `HVAC`, `Microcontrollers`, `Passives`, `Sensors`, etc.).
-  - **Invoice Document Auto-Logger**: Upload supplier invoices (`.pdf`, `.docx`, `.csv`, `.tsv`, `.txt`, `.json`) to automatically extract item **Name**, **SKU**, **Quantity**, **Order Date**, and **Delivery / Arrival Time**. Confirm quantities, assign each component to its Stanley drawer, and commit atomically.
-  - **Logged Invoices & Arrivals** panel and an auditable **Transaction Ledger** tracking every intake, deduction, and transfer.
+  - Clean unified search bar (`Search SKU, invoice, or drawer...`) and category filters (`Microcontrollers`, `Semiconductors`, `Passives`, `Sensors`, `Cables & Connectors`, etc.).
+  - **Invoice Document Auto-Logger**: Upload supplier invoices (`.pdf`, `.docx`, `.csv`, `.tsv`, `.txt`, `.json`) to automatically extract item **Name**, **SKU**, **Quantity**, **Order Date**, and **Delivery / Arrival Time**. Extracted items are staged directly into the **"Yet to be Delivered"** box without forcing compartment assignments upfront.
+  - **"Yet to be Delivered" In-Transit Hub**: Dedicated management space displaying incoming electronic components, expected arrivals, and in-transit valuation. When parcels arrive, assign physical Stanley drawers (`S01–S30` or `L01–L09`) via the visual matrix modal or mobile scanner.
+  - **Dynamic Network Discovery**: Seamless dropdown selector for multiple Wi-Fi/Ethernet adapters, custom IP input, and live QR code generation.
+  - **Logged Invoices & Arrivals** audit panel and **Permanent Transaction Ledger**.
   - Printable 39-compartment QR label sheet modal for drawer stickers.
 - **Android Mobile Experience**:
-  - High-precision in-browser QR & 1D barcode camera scanner (native `BarcodeDetector` + `jsQR` engine with tap-to-focus, center-crop sensor precision, rear camera selection, flash/torch toggle, photo upload fallback, and manual entry).
-  - **Mobile Invoice Tab**: Upload downloaded PDF/DOCX/CSV invoices directly from your phone, confirm quantities, tap Stanley compartments (`S01–L09`), and commit to the master database.
+  - High-precision in-browser QR & all-format 1D/2D barcode camera scanner (hardware `BarcodeDetector` + `jsQR` engine supporting QR, Code 128, Code 39, Code 93, Codabar, ITF, EAN-13, EAN-8, UPC-A, UPC-E, PDF417, Aztec, Data Matrix with tap-to-focus, center-crop sensor precision, rear camera selection, flash/torch toggle, photo upload fallback, and manual entry).
+  - **Hardware Arrival Auto-Match**: Scanning an in-transit SKU or barcode automatically detects the pending invoice order and pre-fills details, requiring only a single tap on the Stanley compartment.
+  - **Mobile Invoice Tab**: Upload downloaded PDF/DOCX/CSV invoices directly from your phone to stage them into "Yet to be Delivered".
   - Touch-friendly 39-drawer grid with drawer detail bottom sheet, quantity stepper, and quick deduction.
   - Full **PWA Installation**: Install directly from Chrome to your phone's home screen without needing an APK.
 
@@ -49,9 +66,10 @@ start.bat
 ```
 `start.bat` will:
 1. Verify Python is installed.
-2. Automatically install all required dependencies from `requirements.txt`.
-3. Launch the dual HTTP (`8000`) & HTTPS (`8443`) server.
-4. Automatically open `http://localhost:8000` in your default browser.
+2. Automatically add Windows Firewall rules for TCP ports 8000 and 8443 so mobile devices can connect across your local network.
+3. Automatically install all required dependencies from `requirements.txt`.
+4. Launch the dual HTTP (`8000`) & HTTPS (`8443`) server.
+5. Automatically open `http://localhost:8000` in your default browser.
 
 ---
 
@@ -66,7 +84,7 @@ start.bat
    python run_server.py
    ```
 
-The server automatically detects your local Wi-Fi IP and outputs:
+The server automatically detects your active network adapters and displays:
 - **Windows Desktop (Local HTTP)**: `http://localhost:8000`
 - **Windows Desktop (Local HTTPS)**: `https://localhost:8443`
 - **Android Mobile (LAN HTTPS)**: `https://<your-local-ip>:8443`
@@ -76,22 +94,30 @@ The server automatically detects your local Wi-Fi IP and outputs:
 
 ---
 
-## Connecting Your Android Phone
+## Connecting Your Android Phone & Troubleshooting Network Timeouts
 
-1. Connect your Android phone to the **same Wi-Fi network** as your Windows PC.
-2. Open **Google Chrome** on your phone and navigate to:
-   ```
-   https://<your-laptop-ip>:8443
-   ```
-   *(e.g., `https://192.168.29.243:8443`)*
-3. **Accept Local SSL Certificate**:
-   - Because the LAN SSL certificate is self-signed, Chrome displays *"Your connection is not private"*.
-   - Tap **Advanced**, then tap **Proceed to site (unsafe)**.
-   *(HTTPS is required by Android Chrome for camera access and PWA installation).*
-4. **Install as App (PWA)**:
-   - Tap Chrome's menu (`⋮`) -> **"Add to Home screen"** or **"Install app"**.
-5. **Camera Scanning & Invoices**:
-   - Use the **Scanner** tab to scan QR/barcodes or tap the **Invoice** tab to upload supplier PDF/DOCX/CSV invoices directly from your phone.
+If you or a friend test on another laptop and Wi-Fi network and get a **"Connection timed out"** error on mobile:
+
+### 1. Active Network Adapter Selection
+Click **"Connect Mobile (PWA)"** on the desktop dashboard. If the laptop has multiple network adapters (e.g. Wi-Fi, Ethernet, WSL, or VirtualBox), use the **"Active Network Adapter"** dropdown to select the IP of the Wi-Fi network your phone is connected to. The QR code updates instantly.
+
+### 2. Windows Firewall Check
+Windows Firewall may block inbound connections on public Wi-Fi networks by default. Run this in PowerShell (as Administrator):
+```powershell
+New-NetFirewallRule -DisplayName "SKR Tech Inventory (HTTP 8000)" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow
+New-NetFirewallRule -DisplayName "SKR Tech Inventory (HTTPS 8443)" -Direction Inbound -Protocol TCP -LocalPort 8443 -Action Allow
+```
+*(Our `start.bat` script automatically configures these rules on launch!)*
+
+### 3. Wi-Fi AP Isolation
+Some home routers or public guest Wi-Fi networks have **"AP Isolation"** / **"Client Isolation"** enabled, preventing connected devices from talking to one another.
+- **Easy Workaround**: Turn on **Mobile Hotspot** on the Windows laptop (Settings → Network & internet → Mobile hotspot) and connect the Android phone directly to the laptop's hotspot! Then open `https://192.168.137.1:8443`.
+
+### 4. Accept Local SSL Certificate
+Because camera permissions and PWA installation on Android Chrome strictly require HTTPS, a locally-generated SSL certificate is used:
+1. Open `https://<laptop-ip>:8443` in Chrome on your phone.
+2. When Chrome shows *"Your connection is not private"*, tap **Advanced**, then tap **Proceed to site (unsafe)**.
+3. Tap Chrome's menu (`⋮`) -> **"Add to Home screen"** or **"Install app"**.
 
 ---
 
@@ -109,7 +135,7 @@ inventory_master.db
 ```
 ├── backend/
 │   └── app/
-│       ├── api/router.py                    # REST API endpoints, invoice parsing & sync route
+│       ├── api/router.py                    # REST API endpoints, invoice parsing, network info & sync
 │       ├── database/                        # SQLAlchemy models, SQLite WAL engine & migrations
 │       │   ├── connection.py
 │       │   ├── models.py
@@ -117,22 +143,24 @@ inventory_master.db
 │       ├── schemas/inventory.py             # Pydantic request & response schemas
 │       ├── services/
 │       │   ├── inventory_service.py         # Core inventory, stock & atomic invoice logging
-│       │   └── invoice_parser.py            # Spatial PDF, DOCX, CSV, TXT & JSON invoice extractor
-│       ├── config.py                        # Server settings & LAN network configs
-│       └── main.py                          # FastAPI app & SPA static asset mount
-├── certs/                                   # Self-signed TLS/SSL SAN certificates
+│       │   ├── invoice_parser.py            # Spatial PDF, DOCX, CSV, TXT & JSON invoice extractor
+│       │   ├── network_service.py           # Multi-interface LAN IP detection
+│       │   └── ssl_service.py               # Dynamic SAN SSL certificate provisioning
+│       ├── config.py                        # Server settings & branding
+│       └── main.py                          # FastAPI app, static assets & SPA mount
+├── certs/                                   # Dynamic TLS/SSL SAN certificates
 │   ├── cert.pem
 │   └── key.pem
-├── frontend/                                # React + TypeScript + Vite + Tailwind v4 source
+├── frontend/                                # React + TypeScript + Vite + Tailwind source
 │   ├── dist/                                # Pre-compiled production bundle served by FastAPI
-│   ├── public/                              # PWA Web App Manifest, Service Worker, icons
+│   ├── public/                              # PWA Web App Manifest, Service Worker, logos, icons
 │   ├── src/
 │   │   ├── api/client.ts                    # Typed API client
 │   │   ├── components/
 │   │   │   ├── cabinet/                     # Stanley 39-drawer visualizer & drawer modal
 │   │   │   ├── desktop/                     # Desktop dashboard, parcel intake & invoice modal
 │   │   │   ├── inventory/                   # Inventory table, logged invoices & ledger
-│   │   │   ├── mobile/                      # Mobile cabinet, scanner, invoice & intake views
+│   │   │   ├── mobile/                      # Mobile cabinet, multi-barcode scanner, invoice & intake
 │   │   │   └── qr/                          # Printable drawer QR sheet
 │   │   ├── db/offlineDb.ts                  # IndexedDB offline operations queue
 │   │   ├── App.tsx
@@ -140,27 +168,16 @@ inventory_master.db
 │   ├── package.json
 │   └── vite.config.ts
 ├── inventory_master.db                      # Master SQLite database (WAL mode)
-├── generate_ssl.ps1                         # Optional SSL certificate regenerator script
 ├── requirements.txt                         # Python backend dependencies
 ├── run_server.py                            # Concurrent dual HTTP (8000) & HTTPS (8443) server
-├── start.bat                                # 1-Click launcher for Windows
+├── start.bat                                # 1-Click launcher with firewall auto-configuration
 ├── LICENSE                                  # Apache License 2.0
 └── README.md                                # Project documentation
 ```
 
 ---
 
-## Modifying Frontend Source (Optional)
+## License & Attribution
 
-If you want to customize the React + TypeScript UI:
-```bash
-cd frontend
-npm install
-npm run dev     # Starts Vite dev server with hot reload
-npm run build   # Rebuilds production bundle into frontend/dist/
-```
-
----
-
-## License
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Developed by **Gowthum Vijaay D** (`srigowv@gmail.com`).
+Licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.

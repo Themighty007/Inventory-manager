@@ -3,8 +3,10 @@ import { DrawerSummary, ItemResponse } from '../types/inventory';
 export interface PendingOperation {
   client_op_id: string; // Unique UUID
   action: 'RECEIVE' | 'CONSUME' | 'TRANSFER' | 'INVOICE_COMMIT';
+  op_type?: 'RECEIVE' | 'CONSUME' | 'TRANSFER' | 'INVOICE_COMMIT';
   payload: any;
   timestamp: string;
+  created_at?: string;
   status: 'PENDING' | 'SYNCING' | 'SYNCED' | 'FAILED';
   error?: string;
 }

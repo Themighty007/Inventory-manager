@@ -4,12 +4,14 @@ import {
   ItemResponse,
   TransactionResponse,
   InvoiceSummaryResponse,
+  PendingDeliveryItem,
 } from './types/inventory';
 import {
   fetchDrawers,
   fetchItems,
   fetchTransactions,
   fetchInvoices,
+  fetchPendingDeliveries,
   checkServerHealth,
   syncBatchOperations,
 } from './api/client';
@@ -47,9 +49,17 @@ export const App: React.FC = () => {
 
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [userName, setUserName] = useState<string>(() => {
-    return localStorage.getItem('inventory_user_name') || 'Admin User';
+    const urlParams = new URLSearchParams(window.location.search);
+    const userParam = urlParams.get('user');
+    if (userParam) {
+      localStorage.setItem('inventory_user_name', userParam);
+      return userParam;
+    }
+    return localStorage.getItem('inventory_user_name') || 'Gowthum';
   });
   const [showInitialLogin, setShowInitialLogin] = useState<boolean>(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('user')) return false;
     return !localStorage.getItem('inventory_user_name');
   });
   const [loginNameInput, setLoginNameInput] = useState('');
@@ -58,6 +68,7 @@ export const App: React.FC = () => {
   const [items, setItems] = useState<ItemResponse[]>([]);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
   const [invoices, setInvoices] = useState<InvoiceSummaryResponse[]>([]);
+  const [pendingDeliveries, setPendingDeliveries] = useState<PendingDeliveryItem[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
@@ -146,17 +157,19 @@ export const App: React.FC = () => {
 
   const loadAllData = async () => {
     try {
-      const [d, it, tx, inv] = await Promise.all([
+      const [d, it, tx, inv, pending] = await Promise.all([
         fetchDrawers(),
         fetchItems(),
         fetchTransactions(),
         fetchInvoices().catch(() => [] as InvoiceSummaryResponse[]),
+        fetchPendingDeliveries().catch(() => [] as PendingDeliveryItem[]),
       ]);
 
       setDrawers(d);
       setItems(it);
       setTransactions(tx);
       setInvoices(inv);
+      setPendingDeliveries(pending);
       setIsOnline(true);
 
       // Save fresh copy to IndexedDB for offline resilience
@@ -219,21 +232,21 @@ export const App: React.FC = () => {
     viewMode === 'MOBILE' || (viewMode === 'AUTO' && isMobileScreen);
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#F8F6F1]">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#F8FAFC]">
       {/* View Switcher & Global Status Bar (Desktop Banner) */}
-      <div className="bg-[#18181B] text-white px-4 py-1.5 flex items-center justify-between text-[11px] font-mono border-b border-[#27272A] z-30 shrink-0">
+      <div className="bg-[#0B132B] text-white px-4 py-1.5 flex items-center justify-between text-[11px] font-mono border-b border-slate-800 z-30 shrink-0">
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1.5">
             <span
               className={`w-2 h-2 rounded-full ${
-                isOnline ? 'bg-[#86EFAC] animate-pulse' : 'bg-[#FCA5A5]'
+                isOnline ? 'bg-[#2EC4B6] animate-pulse' : 'bg-red-400'
               }`}
             />
-            <b>{isOnline ? 'MASTER SERVER ONLINE' : 'OFFLINE MODE'}</b>
+            <b className="tracking-wide">{isOnline ? 'MASTER SERVER ONLINE' : 'OFFLINE MODE'}</b>
           </span>
 
           {pendingCount > 0 && (
-            <span className="bg-[#B91C1C] text-white px-2 py-0.2 rounded-full font-bold text-[10px]">
+            <span className="bg-[#00B4D8] text-white px-2 py-0.2 rounded-full font-bold text-[10px]">
               {pendingCount} Pending Sync
             </span>
           )}
@@ -241,27 +254,33 @@ export const App: React.FC = () => {
 
         {/* View Switcher Controls */}
         <div className="flex items-center gap-1.5">
-          <span className="text-[#A1A1AA] hidden sm:inline">VIEW:</span>
+          <span className="text-slate-400 hidden sm:inline text-[10px]">VIEW:</span>
           <button
             onClick={() => setViewMode('AUTO')}
-            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-              viewMode === 'AUTO' ? 'bg-[#FEF08A] text-[#18181B]' : 'text-[#A1A1AA] hover:text-white'
+            className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors ${
+              viewMode === 'AUTO'
+                ? 'bg-[#00B4D8] text-white font-bold'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             Auto
           </button>
           <button
             onClick={() => setViewMode('DESKTOP')}
-            className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
-              viewMode === 'DESKTOP' ? 'bg-[#86EFAC] text-[#121316]' : 'text-[#A1A1AA] hover:text-white'
+            className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors flex items-center gap-1 ${
+              viewMode === 'DESKTOP'
+                ? 'bg-[#00B4D8] text-white font-bold'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <Monitor className="w-3 h-3" /> Desktop
           </button>
           <button
             onClick={() => setViewMode('MOBILE')}
-            className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${
-              viewMode === 'MOBILE' ? 'bg-[#DDD6FE] text-[#4C1D95]' : 'text-[#A1A1AA] hover:text-white'
+            className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors flex items-center gap-1 ${
+              viewMode === 'MOBILE'
+                ? 'bg-[#00B4D8] text-white font-bold'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <Smartphone className="w-3 h-3" /> Mobile
@@ -271,10 +290,10 @@ export const App: React.FC = () => {
 
       {/* Global Notice Toast */}
       {notice && (
-        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-[#DCFCE7] border-2 border-[#15803D] text-[#15803D] px-4 py-2 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 max-w-md w-[90%]">
-          <CheckCircle className="w-4 h-4 shrink-0" />
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-50 bg-[#0B132B] border border-[#2EC4B6] text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 max-w-md w-[90%] animate-in fade-in slide-in-from-top-2">
+          <CheckCircle className="w-4 h-4 text-[#2EC4B6] shrink-0" />
           <span className="truncate">{notice}</span>
-          <button onClick={() => setNotice(null)} className="ml-auto font-mono text-xs">✕</button>
+          <button onClick={() => setNotice(null)} className="ml-auto font-mono text-xs text-slate-400 hover:text-white">✕</button>
         </div>
       )}
 
@@ -284,6 +303,7 @@ export const App: React.FC = () => {
           <MobileHome
             drawers={drawers}
             items={items}
+            pendingDeliveries={pendingDeliveries}
             isOnline={isOnline}
             pendingCount={pendingCount}
             userName={userName}
@@ -298,6 +318,7 @@ export const App: React.FC = () => {
             items={items}
             transactions={transactions}
             invoices={invoices}
+            pendingDeliveries={pendingDeliveries}
             userName={userName}
             isOnline={isOnline}
             installPrompt={installPrompt}
@@ -312,14 +333,18 @@ export const App: React.FC = () => {
       {/* First-Time Sign In Prompt */}
       {showInitialLogin && (
         <div className="modal-overlay">
-          <div className="brutal-card bg-white p-6 max-w-sm w-full mx-4 shadow-[4px_4px_0px_#18181B] animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 mb-4 pb-3 border-b-2 border-[#18181B]">
-              <div className="w-10 h-10 rounded-xl bg-[#FEF08A] border-2 border-[#18181B] flex items-center justify-center font-bold">
-                <User className="w-5 h-5 text-[#18181B]" />
-              </div>
+          <div className="skr-card bg-white p-6 max-w-sm w-full mx-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-200">
+              <img
+                src="/logos/logo-symbol.png"
+                alt="SKR Tech"
+                className="w-10 h-10 object-contain"
+              />
               <div>
-                <h2 className="text-base font-black text-[#18181B] uppercase">Sign In</h2>
-                <p className="text-xs text-[#71717A] font-semibold">Enter your name to access inventory</p>
+                <h2 className="text-base font-display font-bold text-[#0B132B]">
+                  SKR Tech's Inventory System
+                </h2>
+                <p className="text-xs text-slate-500 font-medium">Enter your operator signature</p>
               </div>
             </div>
             <form
@@ -332,23 +357,23 @@ export const App: React.FC = () => {
                 }
               }}
             >
-              <label className="block text-xs font-black uppercase text-[#18181B] mb-1.5">
-                Your Name
+              <label className="block text-xs font-bold uppercase text-slate-600 mb-1.5">
+                Operator Name
               </label>
               <input
                 type="text"
                 required
                 autoFocus
-                placeholder="Enter your name..."
+                placeholder="e.g. Gowthum"
                 value={loginNameInput}
                 onChange={(e) => setLoginNameInput(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] focus:outline-none focus:bg-white mb-4"
+                className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-[#00B4D8] mb-4"
               />
               <button
                 type="submit"
-                className="w-full brutal-btn brutal-btn-mint text-xs py-2.5 font-black uppercase"
+                className="w-full btn-cyan text-xs py-2.5 font-semibold rounded-xl"
               >
-                Continue to Inventory
+                Access System
               </button>
             </form>
           </div>

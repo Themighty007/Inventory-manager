@@ -311,6 +311,26 @@ class InventoryService:
                 )
                 db.add(parcel)
 
+        # Auto-fulfill any matching YET_TO_BE_DELIVERED item for this SKU
+        pending_item = (
+            db.query(InvoiceItem)
+            .filter(InvoiceItem.sku == clean_sku, InvoiceItem.status == "YET_TO_BE_DELIVERED")
+            .first()
+        )
+        if pending_item:
+            pending_item.drawer_id = drawer.id
+            pending_item.status = "DELIVERED"
+            if pending_item.invoice_id:
+                parent_inv = db.query(Invoice).filter(Invoice.id == pending_item.invoice_id).first()
+                if parent_inv:
+                    rem = (
+                        db.query(InvoiceItem)
+                        .filter(InvoiceItem.invoice_id == parent_inv.id, InvoiceItem.status == "YET_TO_BE_DELIVERED")
+                        .count()
+                    )
+                    if rem == 0:
+                        parent_inv.status = "DELIVERED"
+
         return item, drawer, total_avail
 
     @staticmethod
@@ -818,58 +838,109 @@ class InventoryService:
             total_units = 0
 
             for line in req.items:
-                item, drawer, total_avail = InventoryService._upsert_stock_in_session(
-                    db,
-                    sku=line.sku,
-                    item_name=line.name,
-                    category=line.category,
-                    unit=line.unit,
-                    quantity=line.quantity,
-                    unit_price=line.unit_price,
-                    drawer_id=line.drawer_id,
-                    sub_tray=line.sub_tray,
-                    supplier=inv.supplier,
-                    invoice_number=inv.invoice_number,
-                    tracking_code=req.sale_order_number and f"SO:{req.sale_order_number}:{line.sku.strip().upper()}",
-                    order_date=order_dt,
-                    delivery_arrival_time=delivery_dt,
-                    notes=line.notes or f"Invoice {inv.invoice_number} ({inv.supplier}) -> {line.drawer_id.upper()}",
-                )
+                clean_sku = line.sku.strip().upper()
+                item = db.query(Item).filter(Item.sku == clean_sku).first()
+                if not item:
+                    item = Item(
+                        sku=clean_sku,
+                        name=line.name.strip() or clean_sku,
+                        category=(line.category or "General").strip(),
+                        unit=(line.unit or "pcs").strip(),
+                        unit_cost=line.unit_price or 0.0,
+                    )
+                    db.add(item)
+                    db.flush()
 
-                inv_item = InvoiceItem(
-                    invoice_id=inv.id,
-                    sku=item.sku,
-                    item_name=line.name.strip() or item.name,
-                    quantity=line.quantity,
-                    unit_price=line.unit_price,
-                    drawer_id=drawer.id,
-                    hsn_code=line.hsn_code,
-                    tax_rate=line.tax_rate,
-                    line_total=line.line_total or round(line.unit_price * line.quantity, 2),
-                    status="LOGGED",
-                )
-                db.add(inv_item)
+                target_drawer_id = (line.drawer_id or "").strip().upper()
+                is_assigned = bool(target_drawer_id and target_drawer_id not in ("UNASSIGNED", "NONE", ""))
+
+                if is_assigned:
+                    item, drawer, total_avail = InventoryService._upsert_stock_in_session(
+                        db,
+                        sku=clean_sku,
+                        item_name=line.name,
+                        category=line.category,
+                        unit=line.unit,
+                        quantity=line.quantity,
+                        unit_price=line.unit_price,
+                        drawer_id=target_drawer_id,
+                        sub_tray=line.sub_tray,
+                        supplier=inv.supplier,
+                        invoice_number=inv.invoice_number,
+                        tracking_code=req.sale_order_number and f"SO:{req.sale_order_number}:{clean_sku}",
+                        order_date=order_dt,
+                        delivery_arrival_time=delivery_dt,
+                        notes=line.notes or f"Invoice {inv.invoice_number} ({inv.supplier}) -> {target_drawer_id}",
+                    )
+
+                    inv_item = InvoiceItem(
+                        invoice_id=inv.id,
+                        sku=clean_sku,
+                        item_name=line.name.strip() or item.name,
+                        quantity=line.quantity,
+                        unit_price=line.unit_price,
+                        drawer_id=drawer.id,
+                        hsn_code=line.hsn_code,
+                        tax_rate=line.tax_rate,
+                        line_total=line.line_total or round(line.unit_price * line.quantity, 2),
+                        status="DELIVERED",
+                    )
+                    db.add(inv_item)
+
+                    if drawer.id not in drawers_used:
+                        drawers_used.append(drawer.id)
+                    committed_results.append({
+                        "sku": clean_sku,
+                        "name": item.name,
+                        "quantity": line.quantity,
+                        "drawer_id": drawer.id,
+                        "status": "DELIVERED",
+                        "new_balance": total_avail,
+                    })
+                else:
+                    inv_item = InvoiceItem(
+                        invoice_id=inv.id,
+                        sku=clean_sku,
+                        item_name=line.name.strip() or item.name,
+                        quantity=line.quantity,
+                        unit_price=line.unit_price,
+                        drawer_id=None,
+                        hsn_code=line.hsn_code,
+                        tax_rate=line.tax_rate,
+                        line_total=line.line_total or round(line.unit_price * line.quantity, 2),
+                        status="YET_TO_BE_DELIVERED",
+                    )
+                    db.add(inv_item)
+
+                    committed_results.append({
+                        "sku": clean_sku,
+                        "name": item.name,
+                        "quantity": line.quantity,
+                        "drawer_id": None,
+                        "status": "YET_TO_BE_DELIVERED",
+                        "new_balance": 0,
+                    })
 
                 total_units += line.quantity
-                if drawer.id not in drawers_used:
-                    drawers_used.append(drawer.id)
-                committed_results.append({
-                    "sku": item.sku,
-                    "name": item.name,
-                    "quantity": line.quantity,
-                    "drawer_id": drawer.id,
-                    "new_balance": total_avail,
-                })
+
+            has_pending = any(r["status"] == "YET_TO_BE_DELIVERED" for r in committed_results)
+            inv.status = "PENDING_DELIVERY" if has_pending else "DELIVERED"
 
             db.commit()
             db.refresh(inv)
 
+            pending_count = sum(1 for r in committed_results if r["status"] == "YET_TO_BE_DELIVERED")
+            delivered_count = len(committed_results) - pending_count
+
+            msg = (
+                f"Logged invoice {inv.invoice_number}: {pending_count} component(s) saved to 'Yet to be Delivered'."
+                if pending_count > 0 and delivered_count == 0
+                else f"Logged invoice {inv.invoice_number}: {delivered_count} assigned, {pending_count} in 'Yet to be Delivered'."
+            )
+
             return {
                 "status": "success",
-                "message": (
-                    f"Logged {len(committed_results)} components ({total_units} units) "
-                    f"from invoice {inv.invoice_number} across {len(drawers_used)} compartment(s)."
-                ),
+                "message": msg,
                 "invoice_id": inv.id,
                 "invoice_number": inv.invoice_number,
                 "sale_order_number": inv.sale_order_number,
@@ -878,12 +949,115 @@ class InventoryService:
                 "delivery_arrival_time": inv.delivery_arrival_time,
                 "items_logged": len(committed_results),
                 "total_units": total_units,
+                "pending_delivery_count": pending_count,
                 "drawers_used": drawers_used,
                 "results": committed_results,
             }
         except Exception:
             db.rollback()
             raise
+
+    @staticmethod
+    def get_pending_deliveries(
+        db: Session,
+        sku: Optional[str] = None,
+        invoice_number: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        q = (
+            db.query(InvoiceItem, Invoice)
+            .join(Invoice, InvoiceItem.invoice_id == Invoice.id)
+            .filter(InvoiceItem.status == "YET_TO_BE_DELIVERED")
+        )
+
+        if sku:
+            q = q.filter(InvoiceItem.sku == sku.upper().strip())
+        if invoice_number:
+            q = q.filter(Invoice.invoice_number.ilike(f"%{invoice_number.strip()}%"))
+
+        results = []
+        for inv_item, inv in q.order_by(Invoice.created_at.desc()).all():
+            results.append({
+                "id": inv_item.id,
+                "invoice_id": inv.id,
+                "invoice_number": inv.invoice_number,
+                "sale_order_number": inv.sale_order_number,
+                "supplier": inv.supplier,
+                "sku": inv_item.sku,
+                "item_name": inv_item.item_name or inv_item.sku,
+                "category": "General",
+                "quantity": inv_item.quantity,
+                "unit_price": inv_item.unit_price,
+                "order_date": inv.order_date.isoformat() if inv.order_date else None,
+                "expected_arrival": inv.delivery_arrival_time.isoformat() if inv.delivery_arrival_time else None,
+                "status": "YET_TO_BE_DELIVERED",
+                "created_at": inv.created_at.isoformat(),
+            })
+        return results
+
+    @staticmethod
+    def assign_pending_delivery_drawer(
+        db: Session,
+        item_id: int,
+        drawer_id: str,
+        quantity: Optional[int] = None,
+        sub_tray: str = "MAIN",
+        operator_name: str = "Operator",
+        notes: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        inv_item = db.query(InvoiceItem).filter(InvoiceItem.id == item_id).first()
+        if not inv_item:
+            raise ValueError(f"Pending delivery item #{item_id} not found.")
+
+        clean_drawer = drawer_id.strip().upper()
+        drawer = db.query(Drawer).filter(Drawer.id == clean_drawer).first()
+        if not drawer:
+            raise ValueError(f"Physical compartment '{clean_drawer}' not found.")
+
+        qty = quantity if (quantity and quantity > 0) else inv_item.quantity
+        inv = db.query(Invoice).filter(Invoice.id == inv_item.invoice_id).first() if inv_item.invoice_id else None
+        inv_num = inv.invoice_number if inv else "Direct"
+        supplier = inv.supplier if inv else "Supplier"
+
+        item, target_drawer, total_avail = InventoryService._upsert_stock_in_session(
+            db,
+            sku=inv_item.sku,
+            item_name=inv_item.item_name,
+            category="General",
+            unit="pcs",
+            quantity=qty,
+            unit_price=inv_item.unit_price,
+            drawer_id=clean_drawer,
+            sub_tray=sub_tray or "MAIN",
+            supplier=supplier,
+            invoice_number=inv_num,
+            tracking_code=f"INV:{inv_num}:{inv_item.sku}",
+            delivery_arrival_time=datetime.utcnow(),
+            notes=notes or f"Assigned from 'Yet to be Delivered' by {operator_name} -> {clean_drawer}",
+        )
+
+        inv_item.drawer_id = clean_drawer
+        inv_item.status = "DELIVERED"
+
+        if inv:
+            rem_count = (
+                db.query(InvoiceItem)
+                .filter(InvoiceItem.invoice_id == inv.id, InvoiceItem.status == "YET_TO_BE_DELIVERED")
+                .count()
+            )
+            if rem_count == 0:
+                inv.status = "DELIVERED"
+
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": f"Assigned {inv_item.sku} ({qty} units) into compartment {clean_drawer}!",
+            "item_id": inv_item.id,
+            "sku": inv_item.sku,
+            "drawer_id": clean_drawer,
+            "quantity": qty,
+            "new_balance": total_avail,
+        }
 
     @staticmethod
     def _build_invoice_summary(inv: Invoice) -> InvoiceSummaryResponse:

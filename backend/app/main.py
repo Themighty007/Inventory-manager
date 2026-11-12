@@ -47,6 +47,10 @@ if FRONTEND_DIST.exists():
     if (FRONTEND_DIST / "icons").exists():
         app.mount("/icons", StaticFiles(directory=FRONTEND_DIST / "icons"), name="icons")
 
+    # Mount logos folder
+    if (FRONTEND_DIST / "logos").exists():
+        app.mount("/logos", StaticFiles(directory=FRONTEND_DIST / "logos"), name="logos")
+
     # Serve Service Worker with required PWA header
     @app.get("/sw.js")
     def serve_service_worker():
@@ -82,10 +86,14 @@ if FRONTEND_DIST.exists():
         # Don't intercept API calls
         if full_path.startswith("api/"):
             return Response(status_code=404)
+        if full_path:
+            direct_file = FRONTEND_DIST / full_path
+            if direct_file.is_file():
+                return FileResponse(direct_file)
         index_file = FRONTEND_DIST / "index.html"
         if index_file.exists():
             return FileResponse(index_file)
-        return Response(content="<h1>Smart Electronics Inventory PWA</h1><p>Frontend building...</p>", media_type="text/html")
+        return Response(content="<h1>SKR Tech's Inventory System</h1><p>Frontend building...</p>", media_type="text/html")
 else:
     @app.get("/")
     def root():

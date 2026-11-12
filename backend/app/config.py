@@ -4,8 +4,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 class Settings:
-    APP_NAME: str = "Smart Electronics Inventory"
-    APP_VERSION: str = "2.0.0-PWA"
+    APP_NAME: str = "SKR Tech's Inventory System"
+    APP_VERSION: str = "2.1.0-PWA"
     API_PREFIX: str = "/api"
 
     DATABASE_URL: str = os.getenv(

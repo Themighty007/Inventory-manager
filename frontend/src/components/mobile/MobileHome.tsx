@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DrawerSummary, ItemResponse } from '../../types/inventory';
+import { DrawerSummary, ItemResponse, PendingDeliveryItem } from '../../types/inventory';
 import { MobileScanner } from './MobileScanner';
 import { MobileParcelIntake } from './MobileParcelIntake';
 import { MobileInvoiceIntake } from './MobileInvoiceIntake';
@@ -12,15 +12,16 @@ import {
   PlusCircle,
   Wifi,
   WifiOff,
-  Cpu,
   RefreshCw,
   Download,
   FileText,
+  Truck,
 } from 'lucide-react';
 
 interface MobileHomeProps {
   drawers: DrawerSummary[];
   items: ItemResponse[];
+  pendingDeliveries?: PendingDeliveryItem[];
   isOnline: boolean;
   pendingCount: number;
   userName: string;
@@ -33,6 +34,7 @@ interface MobileHomeProps {
 export const MobileHome: React.FC<MobileHomeProps> = ({
   drawers,
   items,
+  pendingDeliveries = [],
   isOnline,
   pendingCount,
   userName,
@@ -47,7 +49,6 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
   const handleScanCompleted = (code: string) => {
     setScannedCode(code);
 
-    // Check if the scanned code is a Drawer identifier (e.g. "DRAWER:S01", "DRAWER:L03", "S01", "L05")
     const drawerMatch = code.match(/^(?:DRAWER:)?([SL]\d{2})$/i);
     if (drawerMatch) {
       const drawerId = drawerMatch[1].toUpperCase();
@@ -75,29 +76,31 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#121316] text-[#18181B] select-none overflow-hidden">
+    <div className="flex flex-col h-full bg-[#0B132B] text-slate-100 select-none overflow-hidden">
       {/* Mobile Top App Bar */}
-      <header className="bg-[#121316] text-white px-4 py-2.5 border-b-2 border-[#18181B] flex items-center justify-between z-20">
+      <header className="bg-[#0B132B] text-white px-4 py-2.5 border-b border-slate-800 flex items-center justify-between z-20 shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#FEF08A] text-[#18181B] flex items-center justify-center font-black border-2 border-[#18181B] shadow-[1px_1px_0px_#18181B]">
-            <Cpu className="w-4 h-4 text-[#18181B]" />
-          </div>
+          <img
+            src="/logos/logo-symbol.png"
+            alt="SKR Tech Logo"
+            className="w-7 h-7 object-contain"
+          />
           <div>
-            <div className="text-xs font-black tracking-tight flex items-center gap-1.5">
-              <span>Smart Inventory</span>
-              <span className="text-[9px] text-[#86EFAC] font-mono px-1 rounded bg-[#86EFAC]/20">
+            <div className="text-xs font-display font-bold tracking-tight flex items-center gap-1.5">
+              <span>SKR Tech's Inventory System</span>
+              <span className="text-[9px] text-[#00B4D8] font-mono px-1 rounded bg-[#00B4D8]/10 border border-[#00B4D8]/20">
                 PWA
               </span>
             </div>
-            <div className="text-[10px] text-[#A1A1AA] flex items-center gap-1 font-mono">
+            <div className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
               {isOnline ? (
                 <>
-                  <Wifi className="w-3 h-3 text-[#86EFAC]" />
+                  <Wifi className="w-3 h-3 text-[#2EC4B6]" />
                   <span>Online ({userName})</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-3 h-3 text-[#FCA5A5]" />
+                  <WifiOff className="w-3 h-3 text-red-400" />
                   <span>Offline ({userName})</span>
                 </>
               )}
@@ -109,7 +112,7 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
           {installPrompt && (
             <button
               onClick={onInstallApp}
-              className="px-2 py-1 rounded-lg bg-[#86EFAC] text-[#064E3B] text-[10px] font-black border border-[#18181B] flex items-center gap-1"
+              className="px-2 py-1 rounded-lg bg-[#00B4D8] text-white text-[10px] font-semibold flex items-center gap-1 shadow-xs hover:bg-[#0096b4]"
               title="Install as Android App"
             >
               <Download className="w-3 h-3" /> Install
@@ -118,7 +121,7 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
 
           <button
             onClick={onRefresh}
-            className="p-1.5 rounded-lg border border-[#3F3F46] bg-[#27272A] hover:bg-[#3F3F46] text-white"
+            className="p-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition-colors"
             title="Refresh inventory"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -126,8 +129,30 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
         </div>
       </header>
 
+      {/* Pending Deliveries Alert Strip */}
+      {pendingDeliveries.length > 0 && activeTab !== 'INTAKE' && (
+        <div
+          onClick={() => {
+            const first = pendingDeliveries[0];
+            setScannedCode(first.sku);
+            setActiveTab('INTAKE');
+          }}
+          className="bg-gradient-to-r from-[#00B4D8] to-[#0077B6] text-white px-3.5 py-1.5 flex items-center justify-between text-xs font-semibold cursor-pointer shadow-sm shrink-0"
+        >
+          <div className="flex items-center gap-2">
+            <Truck className="w-3.5 h-3.5 animate-bounce shrink-0" />
+            <span>
+              <strong>{pendingDeliveries.length}</strong> part(s) awaiting delivery slotting
+            </span>
+          </div>
+          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-mono font-bold">
+            Assign Drawer →
+          </span>
+        </div>
+      )}
+
       {/* Screen View Area */}
-      <main className="flex-1 overflow-hidden relative">
+      <main className="flex-1 overflow-hidden relative bg-[#F8FAFC]">
         {activeTab === 'CABINET' && (
           <MobileCabinetView
             drawers={drawers}
@@ -160,6 +185,7 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
           <MobileParcelIntake
             initialCode={scannedCode}
             drawers={drawers}
+            pendingDeliveries={pendingDeliveries}
             isOnline={isOnline}
             userName={userName}
             onCompleted={handleIntakeCompleted}
@@ -178,38 +204,41 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
       </main>
 
       {/* Bottom PWA Tab Bar */}
-      <nav className="bg-white border-t-2 border-[#18181B] py-2 px-1.5 flex items-center justify-around text-[10px] font-bold shadow-[0_-2px_10px_rgba(0,0,0,0.06)] z-20">
+      <nav className="bg-[#0B132B] border-t border-slate-800 py-1.5 px-2 flex items-center justify-around text-[10px] font-semibold shadow-lg z-20 shrink-0">
         <button
           onClick={() => setActiveTab('CABINET')}
-          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition-all ${
             activeTab === 'CABINET'
-              ? 'text-[#713F12] bg-[#FEF08A] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
-              : 'text-[#71717A]'
+              ? 'text-[#00B4D8] bg-[#00B4D8]/10'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Layers className="w-4 h-4" /> Cabinet
+          <Layers className="w-4 h-4" />
+          <span>Cabinet</span>
         </button>
 
         <button
           onClick={() => setActiveTab('SCANNER')}
-          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition-all ${
             activeTab === 'SCANNER'
-              ? 'text-[#064E3B] bg-[#86EFAC] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
-              : 'text-[#71717A]'
+              ? 'text-[#00B4D8] bg-[#00B4D8]/10'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Camera className="w-4 h-4" /> Scanner
+          <Camera className="w-4 h-4" />
+          <span>Scanner</span>
         </button>
 
         <button
           onClick={() => setActiveTab('INVOICE')}
-          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition-all ${
             activeTab === 'INVOICE'
-              ? 'text-[#713F12] bg-[#FDE047] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
-              : 'text-[#71717A]'
+              ? 'text-[#00B4D8] bg-[#00B4D8]/10'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <FileText className="w-4 h-4" /> Invoice
+          <FileText className="w-4 h-4" />
+          <span>Invoice</span>
         </button>
 
         <button
@@ -217,31 +246,38 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
             setScannedCode('');
             setActiveTab('INTAKE');
           }}
-          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition-all ${
             activeTab === 'INTAKE'
-              ? 'text-[#4C1D95] bg-[#DDD6FE] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
-              : 'text-[#71717A]'
+              ? 'text-[#00B4D8] bg-[#00B4D8]/10'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <PlusCircle className="w-4 h-4" /> Intake
+          <PlusCircle className="w-4 h-4" />
+          <span>Intake</span>
         </button>
 
         <button
           onClick={() => setActiveTab('QUEUE')}
-          className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all relative ${
+          className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition-all relative ${
             activeTab === 'QUEUE'
-              ? 'text-[#1E3A8A] bg-[#93C5FD] border border-[#18181B] shadow-[1px_1px_0px_#18181B]'
-              : 'text-[#71717A]'
+              ? 'text-[#00B4D8] bg-[#00B4D8]/10'
+              : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Database className="w-4 h-4" /> Queue
+          <Database className="w-4 h-4" />
+          <span>Queue</span>
           {pendingCount > 0 && (
-            <span className="w-4 h-4 rounded-full bg-[#B91C1C] text-white text-[9px] font-mono flex items-center justify-center border border-white absolute -top-1 right-0.5">
+            <span className="w-4 h-4 rounded-full bg-[#00B4D8] text-white text-[9px] font-mono flex items-center justify-center absolute -top-1 right-0.5 shadow-xs">
               {pendingCount}
             </span>
           )}
         </button>
       </nav>
+
+      {/* Developer Attribution Footer */}
+      <footer className="bg-[#0B132B] border-t border-slate-900 py-1 text-center text-[9px] text-slate-400 font-medium shrink-0">
+        SKR Tech's Inventory System • Developed by <span className="text-[#00B4D8] font-semibold">Gowthum Vijaay D</span>
+      </footer>
     </div>
   );
 };

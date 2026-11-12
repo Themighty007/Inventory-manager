@@ -4,7 +4,6 @@ import { fetchDrawerDetail, consumeStock } from '../../api/client';
 import { enqueueOperation } from '../../db/offlineDb';
 import {
   Layers,
-  QrCode,
   CheckCircle,
   Plus,
   Minus,
@@ -58,7 +57,6 @@ export const MobileCabinetView: React.FC<MobileCabinetViewProps> = ({
         const detail = await fetchDrawerDetail(id);
         setSelectedDetail(detail);
       } else {
-        // Fallback when offline
         const local = drawers.find((d) => d.id === id);
         if (local) {
           setSelectedDetail({
@@ -98,32 +96,33 @@ export const MobileCabinetView: React.FC<MobileCabinetViewProps> = ({
     const qty = Math.min(removeQty, maxQty);
 
     const payload = {
-      sku: itemSku,
       drawer_id: selectedDetail.id,
+      item_sku: itemSku,
       quantity: qty,
-      requester: userName,
-      notes: `Deducted via Mobile PWA`,
+      sub_tray: 'MAIN',
+      reason: 'CONSUMED',
+      operator_name: userName,
+      notes: `Removed via Mobile PWA by ${userName}`,
     };
 
     if (isOnline) {
       try {
         const res = await consumeStock(payload);
-        onNotice(`Removed ${qty} of ${itemSku} from Drawer ${selectedDetail.id}`);
-        // Reload detail
-        const updated = await fetchDrawerDetail(selectedDetail.id);
-        setSelectedDetail(updated);
+        onNotice(`Stock removed: ${res.message}`);
+        handleOpenDrawer(selectedDetail.id);
         onRefresh();
       } catch (err: any) {
-        setActionError(err.message || 'Deduction failed.');
+        setActionError(err.message || 'Failed to remove stock.');
       }
     } else {
-      // Offline queue
       try {
-        await enqueueOperation('CONSUME', payload);
-        onNotice(`Offline: Deduct ${qty} of ${itemSku} queued in phone memory.`);
+        const queuedOp = await enqueueOperation('CONSUME', payload);
+        onNotice(
+          `Pending Sync: Consume queued in IndexedDB (UUID: ${queuedOp.client_op_id.slice(0, 8)}...).`
+        );
         setIsDetailOpen(false);
       } catch (err: any) {
-        setActionError(err.message);
+        setActionError(`Failed to save offline: ${err.message}`);
       }
     }
   };
@@ -131,34 +130,34 @@ export const MobileCabinetView: React.FC<MobileCabinetViewProps> = ({
   const occupiedCount = drawers.filter((d) => d.is_occupied).length;
 
   return (
-    <div className="flex flex-col h-full bg-[#F8F6F1] overflow-y-auto p-3.5 select-none text-[#18181B] pb-12">
+    <div className="flex flex-col h-full bg-[#F8FAFC] overflow-y-auto p-3.5 select-none text-slate-800 pb-12">
       {/* Overview Status Ribbon */}
-      <div className="p-3 bg-white rounded-xl border-2 border-[#18181B] shadow-[2px_2px_0px_#18181B] flex items-center justify-between mb-3">
+      <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between mb-3">
         <div>
-          <span className="text-[10px] font-black uppercase text-[#71717A] block">
+          <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
             Stanley 1-93-981 Cabinet
           </span>
-          <span className="text-sm font-black text-[#18181B] font-mono">
-            39 Compartments
+          <span className="text-sm font-display font-bold text-[#0B132B]">
+            39 Physical Compartments
           </span>
         </div>
         <div className="text-right">
-          <span className="text-[11px] font-black text-[#15803D] bg-[#DCFCE7] px-2 py-0.5 rounded-md border border-[#86EFAC] inline-block font-mono">
+          <span className="text-[11px] font-semibold text-[#2EC4B6] bg-[#2EC4B6]/10 px-2.5 py-0.5 rounded-full border border-[#2EC4B6]/20 inline-block font-mono">
             {occupiedCount} Occupied • {39 - occupiedCount} Empty
           </span>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 mb-3 text-xs font-bold">
+      <div className="flex items-center gap-1.5 mb-3 text-xs font-semibold">
         {(['ALL', 'OCCUPIED', 'EMPTY'] as const).map((mode) => (
           <button
             key={mode}
             onClick={() => setFilter(mode)}
-            className={`px-3 py-1 rounded-lg border-2 border-[#18181B] transition-all ${
+            className={`px-3 py-1 rounded-lg border transition-all ${
               filter === mode
-                ? 'bg-[#18181B] text-white shadow-[1px_1px_0px_#18181B]'
-                : 'bg-white text-[#18181B] hover:bg-[#F4F4F5]'
+                ? 'bg-[#0B132B] text-white border-[#0B132B] shadow-xs'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
             }`}
           >
             {mode}
@@ -168,9 +167,9 @@ export const MobileCabinetView: React.FC<MobileCabinetViewProps> = ({
 
       {/* SECTION 1: 30 Small Drawers (5 rows x 6 cols) */}
       <div className="mb-4">
-        <div className="text-[10px] font-black uppercase tracking-wider text-[#71717A] mb-1.5 flex items-center justify-between">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
           <span>Upper Section • 30 Small Drawers</span>
-          <span className="font-mono text-[9px]">S01 – S30 (13.5 × 5.0 × 3.5 cm)</span>
+          <span className="font-mono text-[9px]">S01 – S30</span>
         </div>
 
         <div className="grid grid-cols-5 gap-1.5">
@@ -180,16 +179,16 @@ export const MobileCabinetView: React.FC<MobileCabinetViewProps> = ({
               <button
                 key={d.id}
                 onClick={() => handleOpenDrawer(d.id)}
-                className={`p-2 rounded-xl border-2 border-[#18181B] text-center flex flex-col items-center justify-center transition-all active:scale-95 shadow-[1.5px_1.5px_0px_#18181B] ${
+                className={`p-2 rounded-xl border text-center flex flex-col items-center justify-center transition-all active:scale-95 shadow-xs ${
                   !isVisible
                     ? 'opacity-20 pointer-events-none'
                     : d.is_occupied
-                    ? 'bg-[#FEF08A] hover:bg-[#FDE047]'
-                    : 'bg-white hover:bg-[#F4F4F5]'
+                    ? 'bg-[#00B4D8]/10 border-[#00B4D8]/30 hover:bg-[#00B4D8]/20 text-[#00B4D8]'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <span className="font-mono font-black text-xs text-[#18181B]">{d.id}</span>
-                <span className="text-[9px] font-bold text-[#71717A] mt-0.5 font-mono">
+                <span className="font-mono font-bold text-xs">{d.id}</span>
+                <span className="text-[9px] font-medium mt-0.5 font-mono opacity-80">
                   {d.is_occupied ? `${d.total_units}u` : '—'}
                 </span>
               </button>
@@ -200,9 +199,9 @@ export const MobileCabinetView: React.FC<MobileCabinetViewProps> = ({
 
       {/* SECTION 2: 9 Large Drawers (3 rows x 3 cols) */}
       <div>
-        <div className="text-[10px] font-black uppercase tracking-wider text-[#71717A] mb-1.5 flex items-center justify-between">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
           <span>Lower Section • 9 Large Drawers</span>
-          <span className="font-mono text-[9px]">L01 – L09 (13.5 × 11.0 × 6.0 cm)</span>
+          <span className="font-mono text-[9px]">L01 – L09</span>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
@@ -212,16 +211,16 @@ export const MobileCabinetView: React.FC<MobileCabinetViewProps> = ({
               <button
                 key={d.id}
                 onClick={() => handleOpenDrawer(d.id)}
-                className={`p-3 rounded-xl border-2 border-[#18181B] text-center flex flex-col items-center justify-center transition-all active:scale-95 shadow-[2px_2px_0px_#18181B] ${
+                className={`p-3 rounded-xl border text-center flex flex-col items-center justify-center transition-all active:scale-95 shadow-xs ${
                   !isVisible
                     ? 'opacity-20 pointer-events-none'
                     : d.is_occupied
-                    ? 'bg-[#86EFAC] hover:bg-[#6EE7B7]'
-                    : 'bg-white hover:bg-[#F4F4F5]'
+                    ? 'bg-[#2EC4B6]/10 border-[#2EC4B6]/30 hover:bg-[#2EC4B6]/20 text-[#2EC4B6]'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <span className="font-mono font-black text-sm text-[#18181B]">{d.id}</span>
-                <span className="text-[10px] font-bold text-[#18181B] mt-0.5 font-mono">
+                <span className="font-mono font-bold text-sm">{d.id}</span>
+                <span className="text-[10px] font-semibold mt-0.5 font-mono">
                   {d.is_occupied ? `${d.total_units} units` : 'Empty'}
                 </span>
               </button>
@@ -237,177 +236,129 @@ export const MobileCabinetView: React.FC<MobileCabinetViewProps> = ({
           onClick={() => setIsDetailOpen(false)}
         >
           <div
-            className="w-full max-w-md bg-white border-t-4 border-[#18181B] rounded-t-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto"
+            className="w-full max-w-md bg-white border-t border-slate-200 rounded-t-3xl p-5 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b-2 border-[#18181B]">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-[#18181B] text-white flex flex-col items-center justify-center font-mono font-black border-2 border-[#18181B]">
+                <div className="w-12 h-12 rounded-xl bg-[#0B132B] text-white flex flex-col items-center justify-center font-mono font-bold">
                   <span className="text-base">{selectedDetail.id}</span>
-                  <span className="text-[9px] text-[#A1A1AA] uppercase">
+                  <span className="text-[9px] text-[#00B4D8] uppercase">
                     {selectedDetail.drawer_type === 'SMALL' ? 'Small' : 'Large'}
                   </span>
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-black text-[#18181B]">
+                    <h3 className="text-base font-display font-bold text-[#0B132B]">
                       Compartment {selectedDetail.id}
                     </h3>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#18181B] ${
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                         selectedDetail.is_occupied
-                          ? 'bg-[#86EFAC] text-[#064E3B]'
-                          : 'bg-[#FEF08A] text-[#713F12]'
+                          ? 'bg-[#2EC4B6]/10 text-[#2EC4B6] border-[#2EC4B6]/30'
+                          : 'bg-slate-100 text-slate-500 border-slate-200'
                       }`}
                     >
-                      {selectedDetail.is_occupied ? 'Available' : 'Empty'}
+                      {selectedDetail.is_occupied ? 'Occupied' : 'Empty'}
                     </span>
                   </div>
-                  <span className="text-[10px] text-[#71717A] font-mono block">
-                    {selectedDetail.dimensions}
+                  <span className="text-xs text-slate-500 font-mono">
+                    {selectedDetail.total_units} units in compartment
                   </span>
                 </div>
               </div>
 
               <button
                 onClick={() => setIsDetailOpen(false)}
-                className="w-8 h-8 rounded-lg border-2 border-[#18181B] flex items-center justify-center hover:bg-[#F4F4F5]"
+                className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100"
               >
-                <X className="w-4 h-4 text-[#18181B]" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {actionError && (
-              <div className="p-3 bg-[#FEE2E2] border-2 border-[#B91C1C] rounded-xl text-xs font-bold text-[#B91C1C] flex items-center gap-2">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{actionError}</span>
               </div>
             )}
 
-            {/* QR Label Stamp on Mobile */}
-            <div className="p-3 bg-[#FAF9F5] border-2 border-[#18181B] rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 bg-white border-2 border-[#18181B] rounded-lg flex items-center justify-center p-1">
-                  <QrCode className="w-full h-full text-[#18181B]" />
-                </div>
-                <div>
-                  <span className="text-[10px] font-mono text-[#71717A] block">DRAWER STAMP</span>
-                  <span className="text-xs font-mono font-black text-[#18181B]">
-                    DRAWER:{selectedDetail.id}
-                  </span>
-                </div>
-              </div>
-              <span className="text-[10px] font-mono font-bold bg-[#FEF08A] border border-[#18181B] px-2 py-1 rounded">
-                QR Verified
+            {/* Quick Intake Button */}
+            <button
+              onClick={() => {
+                setIsDetailOpen(false);
+                onIntakeForDrawer(selectedDetail.id);
+              }}
+              className="w-full btn-cyan py-2.5 px-4 text-xs font-semibold rounded-xl flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Add / Receive Component into {selectedDetail.id}
+            </button>
+
+            {/* Stored Items List */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider block">
+                Stored Items ({selectedDetail.items.length})
               </span>
-            </div>
 
-            {/* Stored Items / Contents */}
-            <div>
-              <div className="text-[11px] font-black uppercase text-[#71717A] mb-2 flex items-center justify-between">
-                <span>Stored Components</span>
-                <span className="font-mono text-[10px] font-bold">
-                  {selectedDetail.items?.length || 0} unique SKU(s)
-                </span>
-              </div>
-
-              {selectedDetail.items && selectedDetail.items.length > 0 ? (
-                <div className="space-y-3">
-                  {selectedDetail.items.map((it) => (
-                    <div
-                      key={it.sku}
-                      className="p-3.5 bg-white border-2 border-[#18181B] rounded-xl shadow-[2px_2px_0px_#18181B] space-y-3"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="font-mono font-black text-xs text-[#18181B]">
-                            {it.sku}
-                          </div>
-                          <div className="font-semibold text-xs text-[#18181B] mt-0.5">
-                            {it.name}
-                          </div>
-                          <span className="text-[10px] text-[#71717A] uppercase font-mono">
-                            {it.category}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[10px] font-black uppercase text-[#71717A] block">
-                            Available
-                          </span>
-                          <span className="text-sm font-black font-mono text-[#15803D] bg-[#DCFCE7] px-2 py-0.5 rounded border border-[#86EFAC] inline-block">
-                            {it.quantity} {it.unit}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Quantity Stepper & Remove Action */}
-                      <div className="pt-2 border-t border-[#E4E4E7] flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setRemoveQty(Math.max(1, removeQty - 1))}
-                            className="w-7 h-7 rounded border border-[#18181B] flex items-center justify-center font-bold bg-[#F4F4F5]"
-                          >
-                            -
-                          </button>
-                          <span className="w-8 text-center font-mono font-black text-xs">
-                            {removeQty}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setRemoveQty(Math.min(it.quantity, removeQty + 1))}
-                            className="w-7 h-7 rounded border border-[#18181B] flex items-center justify-center font-bold bg-[#F4F4F5]"
-                          >
-                            +
-                          </button>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveStock(it.sku, it.quantity)}
-                          className="flex-1 brutal-btn brutal-btn-coral text-xs py-1.5 px-3 text-[#B91C1C]"
-                        >
-                          <MinusCircle className="w-3.5 h-3.5" /> Remove {removeQty} units
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+              {selectedDetail.items.length === 0 ? (
+                <div className="p-4 rounded-xl border border-dashed border-slate-300 text-center text-slate-400 text-xs">
+                  This drawer is currently empty.
                 </div>
               ) : (
-                <div className="p-4 bg-[#FAFAFA] border-2 border-dashed border-[#D4D4D8] rounded-xl text-center space-y-2">
-                  <span className="text-xs text-[#71717A] font-semibold block">
-                    This drawer compartment is empty.
-                  </span>
-                  <button
-                    onClick={() => {
-                      setIsDetailOpen(false);
-                      onIntakeForDrawer(selectedDetail.id);
-                    }}
-                    className="brutal-btn brutal-btn-mint text-xs py-1.5 px-3 text-[#064E3B]"
+                selectedDetail.items.map((it) => (
+                  <div
+                    key={it.sku}
+                    className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Put Item In Drawer {selectedDetail.id}
-                  </button>
-                </div>
-              )}
-            </div>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="font-mono font-bold text-xs text-[#0B132B]">
+                          {it.sku}
+                        </span>
+                        <div className="text-xs font-medium text-slate-600 line-clamp-1">
+                          {it.name}
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {it.category}
+                        </span>
+                      </div>
+                      <span className="font-mono text-sm font-bold text-[#00B4D8] bg-white px-2 py-0.5 rounded-lg border border-slate-200">
+                        {it.quantity} {it.unit}
+                      </span>
+                    </div>
 
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                onClick={() => {
-                  setIsDetailOpen(false);
-                  onIntakeForDrawer(selectedDetail.id);
-                }}
-                className="flex-1 brutal-btn brutal-btn-yellow text-xs py-2 text-[#713F12]"
-              >
-                <Plus className="w-3.5 h-3.5" /> + Add Stock To {selectedDetail.id}
-              </button>
-              <button
-                onClick={() => setIsDetailOpen(false)}
-                className="py-2 px-4 rounded-xl border-2 border-[#18181B] bg-[#F4F4F5] text-xs font-bold text-[#18181B]"
-              >
-                Close
-              </button>
+                    {/* Stock Removal Controls */}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setRemoveQty((q) => Math.max(1, q - 1))}
+                          className="w-6 h-6 rounded border border-slate-200 bg-white flex items-center justify-center text-slate-600 text-xs font-bold"
+                        >
+                          -
+                        </button>
+                        <span className="font-mono text-xs font-bold w-6 text-center">
+                          {removeQty}
+                        </span>
+                        <button
+                          onClick={() => setRemoveQty((q) => Math.min(it.quantity, q + 1))}
+                          className="w-6 h-6 rounded border border-slate-200 bg-white flex items-center justify-center text-slate-600 text-xs font-bold"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => handleRemoveStock(it.sku, it.quantity)}
+                        className="py-1 px-3 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold flex items-center gap-1"
+                      >
+                        <MinusCircle className="w-3.5 h-3.5 text-red-500" />
+                        <span>Take {removeQty}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

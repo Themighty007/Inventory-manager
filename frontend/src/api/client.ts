@@ -13,6 +13,8 @@ import {
   InvoiceCommitPayload,
   InvoiceCommitResult,
   InvoiceSummaryResponse,
+  PendingDeliveryItem,
+  AssignPendingDrawerPayload,
 } from '../types/inventory';
 
 // Dynamic Base URL resolving to the host that served the PWA (HTTP or HTTPS)
@@ -218,5 +220,43 @@ export async function fetchInvoices(query?: string): Promise<InvoiceSummaryRespo
 export async function fetchInvoiceDetail(invoiceId: number): Promise<InvoiceSummaryResponse> {
   const res = await fetch(`${BASE_URL}/api/invoices/${invoiceId}`);
   if (!res.ok) throw new Error('Failed to load invoice detail');
+  return res.json();
+}
+
+export async function fetchNetworkInfo(): Promise<import('../types/inventory').NetworkInfo> {
+  const res = await fetch(`${BASE_URL}/api/network-info`);
+  if (!res.ok) throw new Error('Failed to fetch network information');
+  return res.json();
+}
+
+export async function fetchPendingDeliveries(sku?: string, invoiceNumber?: string): Promise<PendingDeliveryItem[]> {
+  const params = new URLSearchParams();
+  if (sku && sku.trim()) params.append('sku', sku.trim());
+  if (invoiceNumber && invoiceNumber.trim()) params.append('invoice_number', invoiceNumber.trim());
+  const url = `${BASE_URL}/api/pending-deliveries${params.toString() ? `?${params.toString()}` : ''}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch pending deliveries');
+  return res.json();
+}
+
+export async function assignPendingDeliveryDrawer(
+  itemId: number,
+  payload: AssignPendingDrawerPayload,
+): Promise<{ status: string; message: string; sku: string; drawer_id: string; quantity: number }> {
+  const res = await fetch(`${BASE_URL}/api/pending-deliveries/${itemId}/assign-drawer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let detail = 'Failed to assign drawer';
+    try {
+      const err = await res.json();
+      detail = err.detail || detail;
+    } catch {
+      // keep fallback
+    }
+    throw new Error(detail);
+  }
   return res.json();
 }

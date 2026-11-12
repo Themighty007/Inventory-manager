@@ -11,14 +11,6 @@ interface ParcelIntakeModalProps {
   onSwitchToInvoiceUpload?: () => void;
 }
 
-const getLocalDateTimeString = () => {
-  const now = new Date();
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(
-    now.getHours()
-  )}:${pad(now.getMinutes())}`;
-};
-
 export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
   isOpen,
   defaultSku,
@@ -27,61 +19,65 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
   onRefresh,
   onSwitchToInvoiceUpload,
 }) => {
-  const [sku, setSku] = useState('');
+  const [sku, setSku] = useState(defaultSku || '');
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Microcontrollers');
+  const [drawerId, setDrawerId] = useState(defaultDrawer);
   const [quantity, setQuantity] = useState(1);
   const [unitPrice, setUnitPrice] = useState(0);
   const [supplier, setSupplier] = useState('');
   const [invoice, setInvoice] = useState('');
-  const [orderDate, setOrderDate] = useState('');
-  const [deliveryTime, setDeliveryTime] = useState(getLocalDateTimeString());
-  const [drawerId, setDrawerId] = useState(defaultDrawer);
-  const [trackingCode, setTrackingCode] = useState('');
   const [notes, setNotes] = useState('');
+  const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
+  const [deliveryTime, setDeliveryTime] = useState(
+    new Date().toISOString().slice(0, 16)
+  );
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      if (defaultSku) setSku(defaultSku);
-      if (defaultDrawer) setDrawerId(defaultDrawer);
-      setDeliveryTime(getLocalDateTimeString());
-      setErrorMsg(null);
-    }
-  }, [isOpen, defaultSku, defaultDrawer]);
+    if (defaultSku) setSku(defaultSku);
+    if (defaultDrawer) setDrawerId(defaultDrawer);
+    setErrorMsg(null);
+  }, [defaultSku, defaultDrawer, isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sku.trim()) {
-      setErrorMsg('Component SKU is required.');
-      return;
-    }
+    if (!sku.trim() || !drawerId) return;
+
+    setLoading(true);
+    setErrorMsg(null);
 
     try {
-      setLoading(true);
-      setErrorMsg(null);
       await receiveStock({
         item_sku: sku.trim().toUpperCase(),
         item_name: name.trim() || undefined,
-        category,
-        quantity,
+        category: category,
+        quantity: quantity,
         unit_price: unitPrice,
+        drawer_id: drawerId.toUpperCase().trim(),
+        target_drawer_id: drawerId.toUpperCase().trim(),
         supplier: supplier.trim() || undefined,
         invoice_number: invoice.trim() || undefined,
-        tracking_code: trackingCode.trim() || undefined,
-        drawer_id: drawerId.toUpperCase(),
-        order_date: orderDate ? `${orderDate}T00:00:00` : null,
-        delivery_arrival_time: deliveryTime || getLocalDateTimeString(),
+        order_date: orderDate || undefined,
+        delivery_arrival_time: deliveryTime || undefined,
         notes: notes.trim() || undefined,
       });
 
       onRefresh();
       onClose();
+      // Reset fields
+      setName('');
+      setQuantity(1);
+      setUnitPrice(0);
+      setSupplier('');
+      setInvoice('');
+      setNotes('');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Intake failed');
+      setErrorMsg(err.message);
     } finally {
       setLoading(false);
     }
@@ -107,36 +103,36 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="brutal-card bg-white w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto"
+        className="skr-card bg-white w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b-2 border-[#18181B] mb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#86EFAC] border-2 border-[#18181B] flex items-center justify-center font-bold">
-              <Package className="w-5 h-5 text-[#064E3B]" />
+        <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/20 flex items-center justify-center font-bold">
+              <Package className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black uppercase text-[#18181B]">
+              <h3 className="text-base font-display font-bold text-[#0B132B]">
                 Receive Component / Parcel Intake
               </h3>
-              <p className="text-xs text-[#71717A] font-semibold">
-                Register stock directly into a Stanley cabinet drawer
+              <p className="text-xs text-slate-500 font-medium">
+                Register stock directly into a Stanley cabinet compartment
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg border-2 border-[#18181B] flex items-center justify-center hover:bg-[#F4F4F5]"
+            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100 text-slate-500"
           >
-            <X className="w-4 h-4 text-[#18181B]" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {onSwitchToInvoiceUpload && (
-          <div className="mb-4 p-2.5 rounded-xl bg-[#FEF9C3] border-2 border-[#18181B] flex items-center justify-between gap-2">
-            <span className="text-[11px] font-bold text-[#713F12]">
-              Have a multi-item PDF / DOCX / CSV invoice?
+          <div className="mb-4 p-3 rounded-xl bg-[#00B4D8]/10 border border-[#00B4D8]/30 flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-[#0E7490]">
+              Have a multi-item supplier invoice (PDF/DOCX/CSV)?
             </span>
             <button
               type="button"
@@ -144,15 +140,15 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
                 onClose();
                 onSwitchToInvoiceUpload();
               }}
-              className="px-2.5 py-1 rounded-lg bg-[#18181B] text-[#FEF08A] text-[11px] font-black flex items-center gap-1 hover:opacity-90 shrink-0"
+              className="px-3 py-1 rounded-lg bg-[#0B132B] text-[#00B4D8] text-xs font-bold flex items-center gap-1 hover:bg-slate-900 shrink-0"
             >
-              <FileText className="w-3 h-3" /> Auto-Extract Invoice →
+              <FileText className="w-3 h-3" /> Auto-Extract →
             </button>
           </div>
         )}
 
         {errorMsg && (
-          <div className="mb-4 p-3 bg-[#FEE2E2] border-2 border-[#B91C1C] rounded-xl text-xs font-bold text-[#B91C1C]">
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700">
             {errorMsg}
           </div>
         )}
@@ -160,47 +156,47 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">PART SKU *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">PART SKU *</label>
               <input
                 type="text"
                 value={sku}
                 onChange={(e) => setSku(e.target.value.toUpperCase())}
                 placeholder="e.g. ESP32-DEV-01"
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-bold bg-[#FAFAFA]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white focus:border-[#00B4D8]"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">QUANTITY *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">QUANTITY *</label>
               <input
                 type="number"
                 min={1}
                 value={quantity}
                 onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-black bg-[#FAFAFA]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white focus:border-[#00B4D8]"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-black text-[#18181B] mb-1">DESCRIPTION</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">DESCRIPTION</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. ESP32 Development Board WiFi + BLE"
-              className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-semibold bg-[#FAFAFA]"
+              className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-medium bg-white focus:border-[#00B4D8]"
             />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">CATEGORY</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">CATEGORY</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-bold bg-[#FAFAFA]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-semibold bg-slate-50 focus:border-[#00B4D8]"
               >
                 {categories.map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -208,11 +204,11 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">DRAWER *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">DRAWER *</label>
               <select
                 value={drawerId}
                 onChange={(e) => setDrawerId(e.target.value)}
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-bold bg-[#FAFAFA]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-slate-50 focus:border-[#00B4D8]"
               >
                 {allDrawers.map((d) => (
                   <option key={d} value={d}>Drawer {d}</option>
@@ -220,69 +216,69 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
               </select>
             </div>
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">UNIT COST (₹)</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">UNIT COST (₹)</label>
               <input
                 type="number"
                 min={0}
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(parseFloat(e.target.value) || 0)}
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-bold bg-[#FAFAFA]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white focus:border-[#00B4D8]"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">SUPPLIER</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">SUPPLIER</label>
               <input
                 type="text"
                 value={supplier}
                 onChange={(e) => setSupplier(e.target.value)}
                 placeholder="e.g. Robu.in / Mouser"
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-semibold bg-[#FAFAFA]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-medium bg-white focus:border-[#00B4D8]"
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">INVOICE / TRACKING #</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">INVOICE / TRACKING #</label>
               <input
                 type="text"
                 value={invoice}
                 onChange={(e) => setInvoice(e.target.value)}
                 placeholder="e.g. INV-2026-901"
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono bg-[#FAFAFA]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono bg-white focus:border-[#00B4D8]"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">ORDER DATE</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">ORDER DATE</label>
               <input
                 type="date"
                 value={orderDate}
                 onChange={(e) => setOrderDate(e.target.value)}
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-bold bg-[#FEF9C3]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-semibold bg-slate-50 focus:border-[#00B4D8]"
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">DELIVERY / ARRIVAL TIME</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">DELIVERY / ARRIVAL TIME</label>
               <input
                 type="datetime-local"
                 value={deliveryTime}
                 onChange={(e) => setDeliveryTime(e.target.value)}
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-bold bg-[#DCFCE7]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-semibold bg-slate-50 focus:border-[#00B4D8]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-black text-[#18181B] mb-1">NOTES</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">NOTES</label>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Received for R&D prototyping"
-              className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs bg-[#FAFAFA]"
+              placeholder="e.g. Received for IoT prototyping"
+              className="w-full p-2.5 rounded-lg border border-slate-300 text-xs bg-white focus:border-[#00B4D8]"
             />
           </div>
 
@@ -290,14 +286,14 @@ export const ParcelIntakeModal: React.FC<ParcelIntakeModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="brutal-btn brutal-btn-white text-xs py-2 px-4"
+              className="py-2 px-4 rounded-lg border border-slate-300 text-xs font-semibold text-slate-600 hover:bg-slate-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="brutal-btn brutal-btn-mint text-xs py-2 px-5"
+              className="btn-cyan py-2 px-5 text-xs font-semibold rounded-lg flex items-center gap-1.5"
             >
               <CheckCircle className="w-4 h-4" />
               {loading ? 'Submitting...' : `Register to Drawer ${drawerId}`}
