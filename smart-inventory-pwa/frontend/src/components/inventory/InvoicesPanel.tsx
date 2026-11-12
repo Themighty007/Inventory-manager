@@ -228,7 +228,9 @@ export const InvoicesPanel: React.FC<InvoicesPanelProps> = ({
                                     {row.drawer_id}
                                   </button>
                                 ) : (
-                                  <span className="text-slate-400 font-mono">—</span>
+                                  <span className="px-2 py-0.5 rounded font-mono font-semibold text-[10px] bg-amber-50 text-amber-700 border border-amber-200">
+                                    ⏳ Yet to be Delivered
+                                  </span>
                                 )}
                               </td>
                               <td className="py-2 px-3 text-right font-mono font-bold text-[#2EC4B6]">

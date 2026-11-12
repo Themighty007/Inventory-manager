@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DrawerSummary } from '../../types/inventory';
+import { DrawerSummary, PendingDeliveryItem } from '../../types/inventory';
 import { receiveStock } from '../../api/client';
 import { enqueueOperation } from '../../db/offlineDb';
 import {
@@ -12,11 +12,14 @@ import {
   Clock,
   FileText,
   Calendar,
+  Truck,
+  Sparkles,
 } from 'lucide-react';
 
 interface MobileParcelIntakeProps {
   initialCode?: string;
   drawers: DrawerSummary[];
+  pendingDeliveries?: PendingDeliveryItem[];
   isOnline: boolean;
   userName: string;
   onCompleted: (message: string) => void;
@@ -35,6 +38,7 @@ const getLocalDateTimeString = () => {
 export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
   initialCode = '',
   drawers,
+  pendingDeliveries = [],
   isOnline,
   userName,
   onCompleted,
@@ -120,6 +124,28 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
     setTrackingCode(raw);
     setSku(raw.toUpperCase());
   }, [initialCode, drawers]);
+
+  // Check if current SKU matches any pending in-transit delivery
+  const matchedPending = pendingDeliveries.find(
+    (p) => sku.trim() && p.sku.toUpperCase() === sku.trim().toUpperCase()
+  );
+
+  const applyPendingDeliveryMatch = (item: PendingDeliveryItem) => {
+    if (item.item_name) setName(item.item_name);
+    setQuantity(item.quantity);
+    setUnitPrice(item.unit_price);
+    setSupplier(item.supplier);
+    setInvoice(item.invoice_number);
+    if (item.order_date) setOrderDate(item.order_date.slice(0, 10));
+    setCategory(item.category || 'General');
+  };
+
+  // Automatically prefill if match found and name is not manually set
+  useEffect(() => {
+    if (matchedPending && !name) {
+      applyPendingDeliveryMatch(matchedPending);
+    }
+  }, [matchedPending]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -264,6 +290,31 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
         <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium flex items-center gap-2 mb-3">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Matched Pending In-Transit Order Banner */}
+      {matchedPending && (
+        <div className="mb-3.5 p-3 rounded-xl bg-gradient-to-r from-[#00B4D8]/10 to-[#2EC4B6]/10 border border-[#00B4D8]/30 space-y-1.5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#0B132B] flex items-center gap-1.5">
+              <Truck className="w-4 h-4 text-[#00B4D8] animate-bounce" />
+              Matched "Yet to be Delivered" Order
+            </span>
+            <span className="text-[10px] font-mono font-bold bg-[#00B4D8] text-white px-2 py-0.5 rounded-full">
+              Inv: {matchedPending.invoice_number}
+            </span>
+          </div>
+          <div className="text-[11px] text-slate-600 font-medium">
+            Supplier: <strong className="text-slate-800">{matchedPending.supplier}</strong> • Qty: <strong className="text-slate-800">{matchedPending.quantity} pcs</strong> • Rate: <strong className="text-slate-800">₹{matchedPending.unit_price.toFixed(2)}</strong>
+          </div>
+          <button
+            type="button"
+            onClick={() => applyPendingDeliveryMatch(matchedPending)}
+            className="text-[10px] font-bold text-[#00B4D8] hover:underline flex items-center gap-1 pt-0.5"
+          >
+            <Sparkles className="w-3 h-3" /> Auto-fill details from invoice
+          </button>
         </div>
       )}
 

@@ -21,6 +21,8 @@ from backend.app.schemas.inventory import (
     ParsedInvoiceResponse,
     InvoiceCommitRequest,
     InvoiceSummaryResponse,
+    PendingDeliveryItemResponse,
+    AssignPendingDrawerRequest,
 )
 from backend.app.services.inventory_service import InventoryService
 from backend.app.services.invoice_parser import parse_invoice_document
@@ -217,6 +219,45 @@ def get_invoice_detail(invoice_id: int, db: Session = Depends(get_db)):
         return InventoryService.get_invoice_detail(db, invoice_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# ===================== PENDING DELIVERIES (YET TO BE DELIVERED) =====================
+@api_router.get(
+    "/pending-deliveries",
+    response_model=List[PendingDeliveryItemResponse],
+    summary="List components and invoice items awaiting physical delivery",
+)
+def get_pending_deliveries(
+    sku: Optional[str] = Query(None, description="Filter by component SKU"),
+    invoice_number: Optional[str] = Query(None, description="Filter by invoice reference"),
+    db: Session = Depends(get_db),
+):
+    return InventoryService.get_pending_deliveries(db, sku=sku, invoice_number=invoice_number)
+
+
+@api_router.post(
+    "/pending-deliveries/{item_id}/assign-drawer",
+    summary="Assign a physical Stanley cabinet drawer to an arrived delivery item",
+)
+def assign_pending_delivery_drawer(
+    item_id: int,
+    req: AssignPendingDrawerRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        return InventoryService.assign_pending_delivery_drawer(
+            db,
+            item_id=item_id,
+            drawer_id=req.drawer_id,
+            quantity=req.quantity,
+            sub_tray=req.sub_tray or "MAIN",
+            operator_name=req.operator_name or "Gowthum",
+            notes=req.notes,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to assign drawer: {str(e)}")
 
 
 # ===================== QR CODES =====================

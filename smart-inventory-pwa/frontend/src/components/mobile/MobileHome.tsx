@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DrawerSummary, ItemResponse } from '../../types/inventory';
+import { DrawerSummary, ItemResponse, PendingDeliveryItem } from '../../types/inventory';
 import { MobileScanner } from './MobileScanner';
 import { MobileParcelIntake } from './MobileParcelIntake';
 import { MobileInvoiceIntake } from './MobileInvoiceIntake';
@@ -15,11 +15,13 @@ import {
   RefreshCw,
   Download,
   FileText,
+  Truck,
 } from 'lucide-react';
 
 interface MobileHomeProps {
   drawers: DrawerSummary[];
   items: ItemResponse[];
+  pendingDeliveries?: PendingDeliveryItem[];
   isOnline: boolean;
   pendingCount: number;
   userName: string;
@@ -32,6 +34,7 @@ interface MobileHomeProps {
 export const MobileHome: React.FC<MobileHomeProps> = ({
   drawers,
   items,
+  pendingDeliveries = [],
   isOnline,
   pendingCount,
   userName,
@@ -126,6 +129,28 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
         </div>
       </header>
 
+      {/* Pending Deliveries Alert Strip */}
+      {pendingDeliveries.length > 0 && activeTab !== 'INTAKE' && (
+        <div
+          onClick={() => {
+            const first = pendingDeliveries[0];
+            setScannedCode(first.sku);
+            setActiveTab('INTAKE');
+          }}
+          className="bg-gradient-to-r from-[#00B4D8] to-[#0077B6] text-white px-3.5 py-1.5 flex items-center justify-between text-xs font-semibold cursor-pointer shadow-sm shrink-0"
+        >
+          <div className="flex items-center gap-2">
+            <Truck className="w-3.5 h-3.5 animate-bounce shrink-0" />
+            <span>
+              <strong>{pendingDeliveries.length}</strong> part(s) awaiting delivery slotting
+            </span>
+          </div>
+          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-mono font-bold">
+            Assign Drawer →
+          </span>
+        </div>
+      )}
+
       {/* Screen View Area */}
       <main className="flex-1 overflow-hidden relative bg-[#F8FAFC]">
         {activeTab === 'CABINET' && (
@@ -160,6 +185,7 @@ export const MobileHome: React.FC<MobileHomeProps> = ({
           <MobileParcelIntake
             initialCode={scannedCode}
             drawers={drawers}
+            pendingDeliveries={pendingDeliveries}
             isOnline={isOnline}
             userName={userName}
             onCompleted={handleIntakeCompleted}

@@ -4,11 +4,13 @@ import {
   ItemResponse,
   TransactionResponse,
   InvoiceSummaryResponse,
+  PendingDeliveryItem,
   NetworkInfo,
 } from '../../types/inventory';
 import { StanleyCabinetVisualizer } from '../cabinet/StanleyCabinetVisualizer';
 import { InventoryTable } from '../inventory/InventoryTable';
 import { InvoicesPanel } from '../inventory/InvoicesPanel';
+import { YetToBeDeliveredPanel } from '../inventory/YetToBeDeliveredPanel';
 import { TransactionLedger } from '../inventory/TransactionLedger';
 import { DrawerModal } from '../cabinet/DrawerModal';
 import { ParcelIntakeModal } from './ParcelIntakeModal';
@@ -38,6 +40,8 @@ import {
   HelpCircle,
   Copy,
   Check,
+  Truck,
+  Clock,
 } from 'lucide-react';
 
 interface DesktopDashboardProps {
@@ -45,6 +49,7 @@ interface DesktopDashboardProps {
   items: ItemResponse[];
   transactions: TransactionResponse[];
   invoices: InvoiceSummaryResponse[];
+  pendingDeliveries?: PendingDeliveryItem[];
   userName: string;
   isOnline: boolean;
   installPrompt: any;
@@ -59,6 +64,7 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
   items,
   transactions,
   invoices,
+  pendingDeliveries = [],
   userName,
   isOnline,
   installPrompt,
@@ -67,14 +73,26 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
   onUpdateUserName,
   onInstallApp,
 }) => {
-  // Navigation: ALL, CABINET, INVENTORY, INVOICES, LEDGER
-  const [activeView, setActiveView] = useState<'ALL' | 'CABINET' | 'INVENTORY' | 'INVOICES' | 'LEDGER'>('ALL');
+  // Navigation: ALL, CABINET, INVENTORY, PENDING_DELIVERY, INVOICES, LEDGER
+  const [activeView, setActiveView] = useState<'ALL' | 'CABINET' | 'INVENTORY' | 'PENDING_DELIVERY' | 'INVOICES' | 'LEDGER'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('view')?.toUpperCase();
+    if (v === 'PENDING' || v === 'PENDING_DELIVERY') return 'PENDING_DELIVERY';
+    if (v === 'CABINET') return 'CABINET';
+    if (v === 'INVENTORY') return 'INVENTORY';
+    if (v === 'INVOICES') return 'INVOICES';
+    if (v === 'LEDGER') return 'LEDGER';
+    return 'ALL';
+  });
   const [globalSearch, setGlobalSearch] = useState('');
 
   // Modals
   const [selectedDrawerId, setSelectedDrawerId] = useState<string | null>(null);
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
-  const [isInvoiceUploadOpen, setIsInvoiceUploadOpen] = useState(false);
+  const [isInvoiceUploadOpen, setIsInvoiceUploadOpen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('modal') === 'invoice';
+  });
   const [intakeSku, setIntakeSku] = useState<string | undefined>();
   const [intakeDrawer, setIntakeDrawer] = useState<string>('S01');
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
@@ -229,6 +247,28 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
                 <span>Inventory Items</span>
               </div>
               <span className="font-mono text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">{items.length}</span>
+            </button>
+
+            {/* Yet to be Delivered */}
+            <button
+              onClick={() => setActiveView('PENDING_DELIVERY')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeView === 'PENDING_DELIVERY'
+                  ? 'bg-gradient-to-r from-[#00B4D8]/25 to-[#2EC4B6]/15 text-[#00B4D8] border border-[#00B4D8]/50 shadow-sm'
+                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Truck className="w-4 h-4 shrink-0" />
+                <span>Yet to be Delivered</span>
+              </div>
+              {pendingDeliveries.length > 0 ? (
+                <span className="font-mono text-[10px] bg-[#00B4D8] text-white px-2 py-0.5 rounded-full font-bold shadow-xs">
+                  {pendingDeliveries.length}
+                </span>
+              ) : (
+                <span className="font-mono text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">0</span>
+              )}
             </button>
 
             {/* Invoices & Arrivals */}
@@ -389,14 +429,14 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
         {/* Content Body */}
         <main className="content-body pb-16">
           {/* Quick Metrics Ribbon */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="skr-card p-4.5 bg-white flex items-center justify-between">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Total Compartments
                 </div>
                 <div className="text-2xl font-black font-mono text-[#0B132B] mt-0.5">
-                  39 <span className="text-xs text-slate-500 font-sans font-medium">(30 Small, 9 Large)</span>
+                  39 <span className="text-xs text-slate-500 font-sans font-medium">(30S, 9L)</span>
                 </div>
               </div>
               <div className="w-10 h-10 rounded-xl bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/20 flex items-center justify-center">
@@ -410,7 +450,7 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
                   Occupied Compartments
                 </div>
                 <div className="text-2xl font-black font-mono text-[#0B132B] mt-0.5">
-                  {totalOccupied} <span className="text-xs text-[#2EC4B6] font-sans font-semibold">({totalAvailable} Available)</span>
+                  {totalOccupied} <span className="text-xs text-[#2EC4B6] font-sans font-semibold">({totalAvailable} Free)</span>
                 </div>
               </div>
               <div className="w-10 h-10 rounded-xl bg-[#2EC4B6]/10 text-[#2EC4B6] border border-[#2EC4B6]/20 flex items-center justify-center">
@@ -421,7 +461,7 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
             <div className="skr-card p-4.5 bg-white flex items-center justify-between">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Total Stock Units
+                  Physical Stock Units
                 </div>
                 <div className="text-2xl font-black font-mono text-[#0B132B] mt-0.5">
                   {totalUnits} <span className="text-xs text-slate-500 font-sans font-medium">({items.length} SKUs)</span>
@@ -429,6 +469,33 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
               </div>
               <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#0B132B] border border-slate-200 flex items-center justify-center">
                 <Package className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div
+              onClick={() => setActiveView('PENDING_DELIVERY')}
+              className={`skr-card p-4.5 bg-white flex items-center justify-between cursor-pointer transition-all border ${
+                activeView === 'PENDING_DELIVERY'
+                  ? 'border-[#00B4D8] ring-2 ring-[#00B4D8]/20'
+                  : 'border-slate-200 hover:border-[#00B4D8]/50'
+              }`}
+            >
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  Yet to be Delivered
+                  {pendingDeliveries.length > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-[#00B4D8] animate-ping" />
+                  )}
+                </div>
+                <div className="text-2xl font-black font-mono text-[#00B4D8] mt-0.5">
+                  {pendingDeliveries.length}{' '}
+                  <span className="text-xs text-slate-500 font-sans font-medium">
+                    ({pendingDeliveries.reduce((a, b) => a + b.quantity, 0)} units)
+                  </span>
+                </div>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/20 flex items-center justify-center">
+                <Truck className="w-5 h-5" />
               </div>
             </div>
           </div>
@@ -440,6 +507,18 @@ export const DesktopDashboard: React.FC<DesktopDashboardProps> = ({
               selectedDrawerId={selectedDrawerId}
               onSelectDrawer={(id) => setSelectedDrawerId(id)}
               onOpenQrForDrawer={(id) => setSelectedDrawerId(id)}
+            />
+          )}
+
+          {/* Yet to be Delivered Panel */}
+          {(activeView === 'ALL' || activeView === 'PENDING_DELIVERY') && (
+            <YetToBeDeliveredPanel
+              pendingItems={pendingDeliveries}
+              drawers={drawers}
+              searchQuery={globalSearch}
+              onRefresh={onRefresh}
+              onNotice={onNotice}
+              onOpenDrawerModal={(drawerId) => setSelectedDrawerId(drawerId)}
             />
           )}
 

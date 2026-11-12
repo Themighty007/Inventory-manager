@@ -212,7 +212,7 @@ export interface InvoiceCommitItemPayload {
   quantity: number;
   unit: string;
   unit_price: number;
-  drawer_id: string;
+  drawer_id?: string | null;
   sub_tray?: string;
   hsn_code?: string | null;
   tax_rate?: number;
@@ -306,4 +306,29 @@ export interface NetworkInfo {
   primary_http_url: string;
   localhost_http_url: string;
   localhost_https_url: string;
+}
+
+export interface PendingDeliveryItem {
+  id: number;
+  invoice_id: number;
+  invoice_number: string;
+  sale_order_number?: string | null;
+  supplier: string;
+  sku: string;
+  item_name?: string | null;
+  category: string;
+  quantity: number;
+  unit_price: number;
+  order_date?: string | null;
+  expected_arrival?: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface AssignPendingDrawerPayload {
+  drawer_id: string;
+  quantity?: number;
+  sub_tray?: string;
+  operator_name?: string;
+  notes?: string;
 }

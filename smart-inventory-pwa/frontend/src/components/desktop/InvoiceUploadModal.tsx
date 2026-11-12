@@ -14,8 +14,7 @@ import {
   AlertTriangle,
   Calendar,
   Clock,
-  Layers,
-  Grid,
+  Package,
   Plus,
   Minus,
   RotateCcw,
@@ -31,7 +30,6 @@ interface InvoiceUploadModalProps {
 
 interface ReviewRow extends ParsedInvoiceItem {
   selected: boolean;
-  assignedDrawer: string;
 }
 
 const CATEGORIES = [
@@ -62,7 +60,6 @@ function round2(n: number): number {
 
 export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
   isOpen,
-  drawers,
   onClose,
   onRefresh,
   onNotice,
@@ -87,20 +84,8 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
 
   // Editable review rows
   const [rows, setRows] = useState<ReviewRow[]>([]);
-  const [bulkDrawer, setBulkDrawer] = useState('S01');
-  const [pickerRowIdx, setPickerRowIdx] = useState<number | null>(null);
 
   if (!isOpen) return null;
-
-  const allDrawerIds =
-    drawers.length > 0
-      ? drawers.map((d) => d.id)
-      : [
-          ...Array.from({ length: 30 }, (_, i) => `S${String(i + 1).padStart(2, '0')}`),
-          ...Array.from({ length: 9 }, (_, i) => `L${String(i + 1).padStart(2, '0')}`),
-        ];
-
-  const drawerMap = new Map(drawers.map((d) => [d.id, d]));
 
   const resetModal = () => {
     setStep('UPLOAD');
@@ -108,7 +93,6 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
     setRows([]);
     setErrorMsg(null);
     setAllowDuplicateAppend(false);
-    setPickerRowIdx(null);
     setNotes('');
   };
 
@@ -134,7 +118,6 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
       const initialRows: ReviewRow[] = data.items.map((it) => ({
         ...it,
         selected: true,
-        assignedDrawer: it.suggested_drawer_id || '',
       }));
       setRows(initialRows);
       setStep('REVIEW');
@@ -163,21 +146,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
     setRows((prev) => prev.map((r, idx) => (idx === index ? { ...r, ...patch } : r)));
   };
 
-  const applyDrawerToAllUnassigned = () => {
-    setRows((prev) =>
-      prev.map((r) => (r.selected && !r.assignedDrawer ? { ...r, assignedDrawer: bulkDrawer } : r))
-    );
-  };
-
-  const applyDrawerToAllSelected = () => {
-    setRows((prev) =>
-      prev.map((r) => (r.selected ? { ...r, assignedDrawer: bulkDrawer } : r))
-    );
-  };
-
   const selectedRows = rows.filter((r) => r.selected);
-  const assignedCount = selectedRows.filter((r) => r.assignedDrawer.trim().length > 0).length;
-  const unassignedCount = selectedRows.length - assignedCount;
   const totalUnitsToCommit = selectedRows.reduce((acc, r) => acc + Math.max(0, r.quantity), 0);
 
   const handleCommit = async () => {
@@ -188,12 +157,6 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
     }
     if (selectedRows.length === 0) {
       setErrorMsg('Select at least one component to log into inventory.');
-      return;
-    }
-    if (unassignedCount > 0) {
-      setErrorMsg(
-        `${unassignedCount} selected component(s) do not have a cabinet compartment assigned yet. Choose a drawer (S01-S30 or L01-L09) for every selected item.`
-      );
       return;
     }
     const badQty = selectedRows.find((r) => !Number.isFinite(r.quantity) || r.quantity <= 0);
@@ -209,7 +172,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
       quantity: Math.round(r.quantity),
       unit: r.unit || 'pcs',
       unit_price: r.effective_unit_cost || r.unit_price || 0,
-      drawer_id: r.assignedDrawer.trim().toUpperCase(),
+      drawer_id: null as any,
       sub_tray: 'MAIN',
       hsn_code: r.hsn_code || null,
       tax_rate: r.tax_rate || 0,
@@ -234,7 +197,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
         items: commitItems,
       });
 
-      onNotice(res.message);
+      onNotice(`Saved to Yet to be Delivered: ${res.message}`);
       onRefresh();
       resetModal();
       onClose();
@@ -244,9 +207,6 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
       setCommitting(false);
     }
   };
-
-  const smallDrawers = Array.from({ length: 30 }, (_, i) => `S${String(i + 1).padStart(2, '0')}`);
-  const largeDrawers = Array.from({ length: 9 }, (_, i) => `L${String(i + 1).padStart(2, '0')}`);
 
   return (
     <div className="modal-overlay" onClick={handleClose}>
@@ -347,15 +307,15 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                 </p>
               </div>
               <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-xs">
-                <div className="font-display font-bold text-[#0B132B] mb-1">2. Confirm Qty & Compartment</div>
+                <div className="font-display font-bold text-[#0B132B] mb-1">2. "Yet to be Delivered" Box</div>
                 <p className="text-slate-500 font-medium leading-relaxed">
-                  Prompts only for final physical Quantity check and which Stanley drawer (S01–S30, L01–L09) each item enters.
+                  Directly stages items into in-transit tracking. No need to assign cabinet compartments now.
                 </p>
               </div>
               <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-xs">
-                <div className="font-display font-bold text-[#0B132B] mb-1">3. Atomic Audit Log</div>
+                <div className="font-display font-bold text-[#0B132B] mb-1">3. Scan on Hardware Arrival</div>
                 <p className="text-slate-500 font-medium leading-relaxed">
-                  Logs all items, stock lots, invoice record, Order Date & Delivery/Arrival Time in one database commit.
+                  When hardware arrives in hand, scan the QR code / barcode / SKU to slot into Stanley drawers.
                 </p>
               </div>
             </div>
@@ -482,42 +442,17 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
               </div>
             )}
 
-            {/* Quick Bulk Assignment Bar */}
+            {/* Staging Summary Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-white">
               <div className="flex items-center gap-2 text-xs font-semibold text-[#0B132B]">
-                <Layers className="w-4 h-4 text-[#00B4D8]" />
+                <Package className="w-4 h-4 text-[#00B4D8]" />
                 <span>
-                  {assignedCount} / {selectedRows.length} Compartments Assigned • {totalUnitsToCommit} Total Units
+                  {selectedRows.length} Components Selected • {totalUnitsToCommit} Total Units
                 </span>
               </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-medium text-slate-500">Quick Compartment Fill:</span>
-                <select
-                  value={bulkDrawer}
-                  onChange={(e) => setBulkDrawer(e.target.value)}
-                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-50 text-xs font-mono font-semibold focus:outline-none focus:border-[#00B4D8]"
-                >
-                  {allDrawerIds.map((id) => (
-                    <option key={id} value={id}>
-                      {id} ({id.startsWith('L') ? 'Large' : 'Small'})
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={applyDrawerToAllUnassigned}
-                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-[11px] font-semibold text-slate-700"
-                >
-                  Fill Unassigned ({unassignedCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={applyDrawerToAllSelected}
-                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-[11px] font-semibold text-slate-700"
-                >
-                  Set All ({selectedRows.length})
-                </button>
+              <div className="text-[11px] font-medium text-slate-500 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#00B4D8] animate-pulse"></span>
+                <span>Directly staging to <strong>Yet to be Delivered</strong> (Compartment assignment occurs upon hardware arrival)</span>
               </div>
             </div>
 
@@ -527,20 +462,18 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
                     <th className="py-2.5 px-3 w-8 text-center">LOG</th>
-                    <th className="py-2.5 px-3 min-w-[110px]">SKU</th>
-                    <th className="py-2.5 px-3 min-w-[260px]">COMPONENT NAME & CATEGORY</th>
-                    <th className="py-2.5 px-3 min-w-[135px] bg-[#00B4D8]/5 border-x border-slate-200 text-[#00B4D8]">
+                    <th className="py-2.5 px-3 min-w-[120px]">SKU</th>
+                    <th className="py-2.5 px-3 min-w-[280px]">COMPONENT NAME & CATEGORY</th>
+                    <th className="py-2.5 px-3 min-w-[140px] bg-[#00B4D8]/5 border-x border-slate-200 text-[#00B4D8]">
                       QUANTITY *
                     </th>
-                    <th className="py-2.5 px-3 min-w-[205px] bg-[#2EC4B6]/5 border-r border-slate-200 text-[#2EC4B6]">
-                      COMPARTMENT (DRAWER) *
-                    </th>
-                    <th className="py-2.5 px-3 text-right min-w-[85px]">UNIT ₹</th>
+                    <th className="py-2.5 px-3 text-right min-w-[95px]">UNIT ₹</th>
+                    <th className="py-2.5 px-3 text-right min-w-[95px] text-slate-600">TOTAL ₹</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {rows.map((row, idx) => {
-                    const missingDrawer = row.selected && !row.assignedDrawer;
+                    const lineTotal = round2((row.effective_unit_cost || row.unit_price || 0) * row.quantity);
                     return (
                       <tr
                         key={`${row.line_no}-${row.sku}`}
@@ -637,53 +570,6 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                           </div>
                         </td>
 
-                        {/* Prompted Compartment / Drawer */}
-                        <td
-                          className={`py-2.5 px-3 border-r border-slate-200 ${
-                            missingDrawer ? 'bg-red-50/70' : 'bg-[#2EC4B6]/5'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <select
-                              disabled={!row.selected}
-                              value={row.assignedDrawer}
-                              onChange={(e) =>
-                                updateRow(idx, { assignedDrawer: e.target.value })
-                              }
-                              className={`flex-1 px-2 py-1.5 rounded-lg border font-mono font-bold text-xs ${
-                                missingDrawer
-                                  ? 'border-red-300 bg-white text-red-600'
-                                  : 'border-slate-200 bg-white text-slate-800'
-                              }`}
-                            >
-                              <option value="">-- Select Drawer --</option>
-                              {allDrawerIds.map((dId) => {
-                                const info = drawerMap.get(dId);
-                                const tag = info
-                                  ? `${dId} (${info.drawer_type === 'LARGE' ? 'L' : 'S'}, ${
-                                      info.total_units
-                                    }u)`
-                                  : dId;
-                                return (
-                                  <option key={dId} value={dId}>
-                                    {tag}
-                                  </option>
-                                );
-                              })}
-                            </select>
-
-                            <button
-                              type="button"
-                              disabled={!row.selected}
-                              onClick={() => setPickerRowIdx(pickerRowIdx === idx ? null : idx)}
-                              className="p-1.5 rounded-lg border border-slate-200 bg-slate-100 hover:bg-[#00B4D8]/10 text-slate-700 hover:text-[#00B4D8] transition-colors"
-                              title="Pick from 39-compartment visual cabinet grid"
-                            >
-                              <Grid className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-
                         <td className="py-2.5 px-3 text-right font-mono font-semibold text-xs">
                           <input
                             type="number"
@@ -699,104 +585,16 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                             className="w-20 text-right px-1.5 py-1 rounded border border-slate-200 bg-slate-50 font-mono text-xs focus:bg-white focus:border-[#00B4D8]"
                           />
                         </td>
+
+                        <td className="py-2.5 px-3 text-right font-mono font-bold text-xs text-slate-700">
+                          ₹{lineTotal.toFixed(2)}
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-
-            {/* Interactive 39-Compartment Mini Cabinet Popover for Active Row */}
-            {pickerRowIdx !== null && rows[pickerRowIdx] && (
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 shadow-md">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-xs font-bold text-[#0B132B]">
-                    Select Stanley Compartment for{' '}
-                    <span className="font-mono bg-[#00B4D8]/10 text-[#00B4D8] px-2 py-0.5 rounded border border-[#00B4D8]/30">
-                      {rows[pickerRowIdx].sku}
-                    </span>{' '}
-                    <span className="text-slate-500 font-normal">
-                      ({rows[pickerRowIdx].name.slice(0, 50)})
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPickerRowIdx(null)}
-                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline"
-                  >
-                    Close Grid
-                  </button>
-                </div>
-
-                <div className="space-y-2.5">
-                  <div>
-                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">
-                      Small Compartments (S01 – S30)
-                    </div>
-                    <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5">
-                      {smallDrawers.map((dId) => {
-                        const info = drawerMap.get(dId);
-                        const isSelected = rows[pickerRowIdx].assignedDrawer === dId;
-                        const hasItems = (info?.total_units || 0) > 0;
-                        return (
-                          <button
-                            key={dId}
-                            type="button"
-                            onClick={() => {
-                              updateRow(pickerRowIdx, { assignedDrawer: dId });
-                              setPickerRowIdx(null);
-                            }}
-                            className={`py-1.5 px-1 rounded-lg border text-center font-mono text-[11px] font-semibold transition-all ${
-                              isSelected
-                                ? 'bg-[#00B4D8] text-white border-[#00B4D8]'
-                                : hasItems
-                                ? 'bg-[#2EC4B6]/10 text-[#2EC4B6] border-[#2EC4B6]/30 hover:bg-[#2EC4B6]/20'
-                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {dId}
-                            {hasItems ? `·${info?.total_units}` : ''}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">
-                      Large Compartments (L01 – L09)
-                    </div>
-                    <div className="grid grid-cols-3 sm:grid-cols-9 gap-1.5">
-                      {largeDrawers.map((dId) => {
-                        const info = drawerMap.get(dId);
-                        const isSelected = rows[pickerRowIdx].assignedDrawer === dId;
-                        const hasItems = (info?.total_units || 0) > 0;
-                        return (
-                          <button
-                            key={dId}
-                            type="button"
-                            onClick={() => {
-                              updateRow(pickerRowIdx, { assignedDrawer: dId });
-                              setPickerRowIdx(null);
-                            }}
-                            className={`py-2 px-1 rounded-lg border text-center font-mono text-xs font-semibold transition-all ${
-                              isSelected
-                                ? 'bg-[#00B4D8] text-white border-[#00B4D8]'
-                                : hasItems
-                                ? 'bg-[#2EC4B6]/10 text-[#2EC4B6] border-[#2EC4B6]/30 hover:bg-[#2EC4B6]/20'
-                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {dId}
-                            {hasItems ? ` (${info?.total_units})` : ''}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
@@ -806,7 +604,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Received via BlueDart courier, verified physically"
+                placeholder="e.g. Uploaded from supplier dispatch email; physical delivery expected via BlueDart"
                 className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:border-[#00B4D8]"
               />
             </div>
@@ -817,16 +615,10 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
         {step === 'REVIEW' && (
           <div className="pt-4 mt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
             <div className="text-xs font-medium text-slate-500">
-              {unassignedCount > 0 ? (
-                <span className="text-red-600 font-semibold">
-                  Assign compartments to the remaining {unassignedCount} item(s) to enable logging.
-                </span>
-              ) : (
-                <span className="text-[#2EC4B6] font-semibold">
-                  Ready to log {selectedRows.length} component(s) ({totalUnitsToCommit} units) with Order Date{' '}
-                  {orderDate || 'N/A'} & Arrival {deliveryTime.replace('T', ' ')}.
-                </span>
-              )}
+              <span className="text-[#2EC4B6] font-semibold flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-[#2EC4B6]" />
+                Ready to save {selectedRows.length} component(s) ({totalUnitsToCommit} units) into "Yet to be Delivered".
+              </span>
             </div>
 
             <div className="flex items-center gap-2.5">
@@ -841,13 +633,13 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
               <button
                 type="button"
                 onClick={handleCommit}
-                disabled={committing || selectedRows.length === 0 || unassignedCount > 0}
-                className="btn-cyan py-2 px-5 text-xs font-semibold rounded-xl flex items-center gap-2 disabled:opacity-40"
+                disabled={committing || selectedRows.length === 0}
+                className="btn-cyan py-2.5 px-6 text-xs font-semibold rounded-xl flex items-center gap-2 disabled:opacity-40 shadow-sm"
               >
-                <CheckCircle className="w-4 h-4" />
+                <Package className="w-4 h-4" />
                 {committing
-                  ? 'Logging to Master DB...'
-                  : `Log ${selectedRows.length} Component(s) (${totalUnitsToCommit} pcs)`}
+                  ? 'Saving to In-Transit...'
+                  : `Save to Yet to be Delivered (${selectedRows.length} Items)`}
               </button>
             </div>
           </div>

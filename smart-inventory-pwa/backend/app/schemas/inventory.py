@@ -242,11 +242,36 @@ class InvoiceCommitItem(BaseModel):
     quantity: int = Field(gt=0)
     unit: str = "pcs"
     unit_price: float = 0.0
-    drawer_id: str
+    drawer_id: Optional[str] = None
     sub_tray: str = "MAIN"
     hsn_code: Optional[str] = None
     tax_rate: float = 0.0
     line_total: float = 0.0
+    notes: Optional[str] = None
+
+
+class PendingDeliveryItemResponse(BaseModel):
+    id: int
+    invoice_id: int
+    invoice_number: str
+    sale_order_number: Optional[str] = None
+    supplier: str
+    sku: str
+    item_name: Optional[str] = None
+    category: str = "General"
+    quantity: int
+    unit_price: float
+    order_date: Optional[datetime] = None
+    expected_arrival: Optional[datetime] = None
+    status: str = "YET_TO_BE_DELIVERED"
+    created_at: datetime
+
+
+class AssignPendingDrawerRequest(BaseModel):
+    drawer_id: str
+    quantity: Optional[int] = None
+    sub_tray: Optional[str] = "MAIN"
+    operator_name: Optional[str] = "Operator"
     notes: Optional[str] = None
 
 

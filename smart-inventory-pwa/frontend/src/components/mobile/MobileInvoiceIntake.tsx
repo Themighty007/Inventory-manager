@@ -14,11 +14,9 @@ import {
   AlertTriangle,
   Calendar,
   Clock,
-  Layers,
+  Package,
   Plus,
   Minus,
-  ChevronDown,
-  ChevronUp,
   RotateCcw,
 } from 'lucide-react';
 
@@ -32,7 +30,6 @@ interface MobileInvoiceIntakeProps {
 
 interface MobileReviewRow extends ParsedInvoiceItem {
   selected: boolean;
-  assignedDrawer: string;
 }
 
 const getLocalDateTimeString = () => {
@@ -44,7 +41,6 @@ const getLocalDateTimeString = () => {
 };
 
 export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
-  drawers,
   isOnline,
   userName,
   onCompleted,
@@ -66,17 +62,12 @@ export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
   const [allowDuplicateAppend, setAllowDuplicateAppend] = useState(false);
 
   const [rows, setRows] = useState<MobileReviewRow[]>([]);
-  const [expandedGridRow, setExpandedGridRow] = useState<number | null>(0);
-  const [bulkDrawer, setBulkDrawer] = useState('S01');
-
-  const drawerMap = new Map(drawers.map((d) => [d.id, d]));
 
   const resetAll = () => {
     setStep('UPLOAD');
     setParsedDoc(null);
     setRows([]);
     setErrorMsg(null);
-    setExpandedGridRow(0);
     setAllowDuplicateAppend(false);
   };
 
@@ -100,11 +91,8 @@ export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
       const mapped: MobileReviewRow[] = data.items.map((it) => ({
         ...it,
         selected: true,
-        assignedDrawer: it.suggested_drawer_id || '',
       }));
       setRows(mapped);
-      const firstUnassigned = mapped.findIndex((r) => !r.assignedDrawer);
-      setExpandedGridRow(firstUnassigned >= 0 ? firstUnassigned : 0);
       setStep('REVIEW');
     } catch (err: any) {
       setErrorMsg(
@@ -120,16 +108,7 @@ export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
   };
 
   const selectedRows = rows.filter((r) => r.selected);
-  const assignedCount = selectedRows.filter((r) => r.assignedDrawer.trim().length > 0).length;
-  const unassignedCount = selectedRows.length - assignedCount;
   const totalUnits = selectedRows.reduce((acc, r) => acc + Math.max(0, r.quantity), 0);
-
-  const handleApplyUnassigned = () => {
-    setRows((prev) =>
-      prev.map((r) => (r.selected && !r.assignedDrawer ? { ...r, assignedDrawer: bulkDrawer } : r))
-    );
-    setExpandedGridRow(null);
-  };
 
   const handleCommit = async () => {
     setErrorMsg(null);
@@ -139,12 +118,6 @@ export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
     }
     if (selectedRows.length === 0) {
       setErrorMsg('Select at least one component to log.');
-      return;
-    }
-    if (unassignedCount > 0) {
-      const firstIdx = rows.findIndex((r) => r.selected && !r.assignedDrawer);
-      if (firstIdx >= 0) setExpandedGridRow(firstIdx);
-      setErrorMsg(`Please select a compartment for the remaining ${unassignedCount} item(s).`);
       return;
     }
 
@@ -168,7 +141,7 @@ export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
         quantity: Math.max(1, Math.round(r.quantity)),
         unit: r.unit || 'pcs',
         unit_price: r.effective_unit_cost || r.unit_price || 0,
-        drawer_id: r.assignedDrawer.trim().toUpperCase(),
+        drawer_id: null as any,
         sub_tray: 'MAIN',
         hsn_code: r.hsn_code || null,
         tax_rate: r.tax_rate || 0,
@@ -181,7 +154,7 @@ export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
       try {
         const res = await commitInvoice(payload);
         resetAll();
-        onCompleted(`Confirmed: ${res.message}`);
+        onCompleted(`Saved to Yet to be Delivered: ${res.message}`);
       } catch (err: any) {
         setErrorMsg(err?.message || 'Failed to commit invoice to master server.');
       } finally {
@@ -204,9 +177,6 @@ export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
       }
     }
   };
-
-  const smallDrawers = Array.from({ length: 30 }, (_, i) => `S${String(i + 1).padStart(2, '0')}`);
-  const largeDrawers = Array.from({ length: 9 }, (_, i) => `L${String(i + 1).padStart(2, '0')}`);
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] overflow-y-auto p-4 select-none text-slate-800 pb-16">
@@ -280,9 +250,9 @@ export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
           <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-2 text-xs">
             <div className="font-bold text-[#0B132B] text-[11px] uppercase tracking-wider">How It Works</div>
             <div className="text-slate-500 font-medium">1. Pick your downloaded invoice PDF/DOCX/CSV file.</div>
-            <div className="text-slate-500 font-medium">2. Review extracted Name, SKU & Order Date.</div>
+            <div className="text-slate-500 font-medium">2. Review extracted Name, SKU, Quantity & Order Date.</div>
             <div className="text-slate-500 font-medium">
-              3. Confirm <strong>Quantity</strong> & tap the <strong>Stanley Compartment (S01–L09)</strong> for each part!
+              3. Items are saved into <strong>"Yet to be Delivered"</strong>. You will scan and assign Stanley drawers when physical hardware arrives!
             </div>
           </div>
         </div>
@@ -361,183 +331,99 @@ export const MobileInvoiceIntake: React.FC<MobileInvoiceIntakeProps> = ({
             </div>
           </div>
 
-          {/* Quick Bulk Compartment Tool */}
-          <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
-            <span className="text-[11px] font-medium text-slate-600">
-              Bulk Fill:
-            </span>
-            <div className="flex items-center gap-1.5">
-              <select
-                value={bulkDrawer}
-                onChange={(e) => setBulkDrawer(e.target.value)}
-                className="px-2 py-1 rounded-lg border border-slate-300 text-xs font-mono font-semibold bg-slate-50"
-              >
-                {[...smallDrawers, ...largeDrawers].map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleApplyUnassigned}
-                className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-100 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
-              >
-                Fill Unassigned ({unassignedCount})
-              </button>
+          {/* Staging Notice */}
+          <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-[#00B4D8]" />
+              <span className="font-semibold text-[#0B132B]">
+                {selectedRows.length} Items • {totalUnits} Units
+              </span>
             </div>
+            <span className="text-[11px] font-medium text-slate-500">
+              Box: Yet to be Delivered
+            </span>
           </div>
 
           {/* Item Cards List */}
-          <div className="space-y-3">
-            {rows.map((row, idx) => {
-              const isGridOpen = expandedGridRow === idx;
-              const hasCompartment = !!row.assignedDrawer;
-              return (
-                <div
-                  key={`${row.line_no}-${row.sku}`}
-                  className={`bg-white rounded-2xl border transition-all p-3.5 space-y-3 ${
-                    !row.selected
-                      ? 'opacity-40 border-slate-200'
-                      : !hasCompartment
-                      ? 'border-amber-300 bg-amber-50/20'
-                      : 'border-slate-200 shadow-xs'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={row.selected}
-                        onChange={(e) => updateRow(idx, { selected: e.target.checked })}
-                        className="w-4 h-4 accent-[#00B4D8] cursor-pointer"
-                      />
-                      <div>
-                        <span className="font-mono font-bold text-xs text-[#0B132B]">
-                          {row.sku}
-                        </span>
-                        <div className="text-xs font-medium text-slate-600 line-clamp-1">
-                          {row.name}
-                        </div>
+          <div className="space-y-2.5">
+            {rows.map((row, idx) => (
+              <div
+                key={`${row.line_no}-${row.sku}`}
+                className={`bg-white rounded-2xl border transition-all p-3.5 space-y-2.5 ${
+                  !row.selected ? 'opacity-40 border-slate-200' : 'border-slate-200 shadow-xs'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={row.selected}
+                      onChange={(e) => updateRow(idx, { selected: e.target.checked })}
+                      className="w-4 h-4 accent-[#00B4D8] cursor-pointer"
+                    />
+                    <div>
+                      <span className="font-mono font-bold text-xs text-[#0B132B]">
+                        {row.sku}
+                      </span>
+                      <div className="text-xs font-medium text-slate-600 line-clamp-1">
+                        {row.name}
                       </div>
                     </div>
-
-                    <span
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
-                        hasCompartment
-                          ? 'bg-[#2EC4B6]/10 text-[#2EC4B6] border-[#2EC4B6]/30'
-                          : 'bg-red-50 text-red-600 border-red-200'
-                      }`}
-                    >
-                      {hasCompartment ? row.assignedDrawer : 'No Compartment'}
-                    </span>
                   </div>
 
-                  {/* Quantity & Compartment Selector */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => updateRow(idx, { quantity: Math.max(1, row.quantity - 1) })}
-                        className="w-7 h-7 rounded border border-slate-300 bg-white flex items-center justify-center font-bold text-slate-600"
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        min="1"
-                        value={row.quantity}
-                        onChange={(e) =>
-                          updateRow(idx, { quantity: Math.max(1, parseInt(e.target.value) || 1) })
-                        }
-                        className="w-14 text-center py-1 rounded border border-slate-300 font-mono font-bold text-xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => updateRow(idx, { quantity: row.quantity + 1 })}
-                        className="w-7 h-7 rounded border border-slate-300 bg-white flex items-center justify-center font-bold text-slate-600"
-                      >
-                        +
-                      </button>
-                    </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-[#00B4D8]/10 text-[#00B4D8] border-[#00B4D8]/20">
+                    ₹{(row.effective_unit_cost || row.unit_price || 0).toFixed(2)}
+                  </span>
+                </div>
 
+                {/* Quantity Controls */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <span className="text-[11px] font-medium text-slate-500">Intake Quantity:</span>
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setExpandedGridRow(isGridOpen ? null : idx)}
-                      className={`py-1.5 px-2.5 rounded-lg border text-xs font-semibold flex items-center justify-between ${
-                        hasCompartment
-                          ? 'border-slate-300 bg-slate-50 text-slate-700'
-                          : 'border-amber-400 bg-amber-50 text-amber-800 animate-pulse'
-                      }`}
+                      disabled={!row.selected || row.quantity <= 1}
+                      onClick={() => updateRow(idx, { quantity: Math.max(1, row.quantity - 1) })}
+                      className="w-7 h-7 rounded border border-slate-300 bg-white flex items-center justify-center font-bold text-slate-600 disabled:opacity-40"
                     >
-                      <span>{hasCompartment ? `Drawer: ${row.assignedDrawer}` : 'Pick Drawer'}</span>
-                      {isGridOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      disabled={!row.selected}
+                      value={row.quantity}
+                      onChange={(e) =>
+                        updateRow(idx, { quantity: Math.max(1, parseInt(e.target.value) || 1) })
+                      }
+                      className="w-14 text-center py-1 rounded border border-slate-300 font-mono font-bold text-xs"
+                    />
+                    <button
+                      type="button"
+                      disabled={!row.selected}
+                      onClick={() => updateRow(idx, { quantity: row.quantity + 1 })}
+                      className="w-7 h-7 rounded border border-slate-300 bg-white flex items-center justify-center font-bold text-slate-600"
+                    >
+                      +
                     </button>
                   </div>
-
-                  {/* 39 Drawer Compact Picker */}
-                  {isGridOpen && (
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                      <span className="text-[10px] font-bold uppercase text-slate-400 block">
-                        Select Compartment for {row.sku}
-                      </span>
-                      <div className="grid grid-cols-6 gap-1">
-                        {largeDrawers.map((id) => (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => {
-                              updateRow(idx, { assignedDrawer: id });
-                              setExpandedGridRow(null);
-                            }}
-                            className={`py-1 text-center font-mono text-[10px] font-bold rounded border ${
-                              row.assignedDrawer === id
-                                ? 'bg-[#00B4D8] text-white border-[#00B4D8]'
-                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {id}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="grid grid-cols-6 gap-1 pt-1">
-                        {smallDrawers.map((id) => (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => {
-                              updateRow(idx, { assignedDrawer: id });
-                              setExpandedGridRow(null);
-                            }}
-                            className={`py-1 text-center font-mono text-[9px] font-bold rounded border ${
-                              row.assignedDrawer === id
-                                ? 'bg-[#0B132B] text-[#00B4D8] border-[#0B132B]'
-                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {id}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
 
           {/* Commit Button */}
           <button
             type="button"
-            disabled={committing || selectedRows.length === 0 || unassignedCount > 0}
+            disabled={committing || selectedRows.length === 0}
             onClick={handleCommit}
-            className="w-full btn-teal py-3.5 px-4 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 shadow-sm disabled:opacity-40"
+            className="w-full btn-cyan py-3.5 px-4 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 shadow-sm disabled:opacity-40"
           >
-            <CheckCircle className="w-4 h-4" />
+            <Package className="w-4 h-4" />
             <span>
               {committing
-                ? 'Logging to Master Database...'
-                : `Commit ${selectedRows.length} Components (${totalUnits} pcs)`}
+                ? 'Staging in Yet to be Delivered...'
+                : `Save to Yet to be Delivered (${selectedRows.length} Items)`}
             </span>
           </button>
         </div>

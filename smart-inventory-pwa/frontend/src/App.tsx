@@ -4,12 +4,14 @@ import {
   ItemResponse,
   TransactionResponse,
   InvoiceSummaryResponse,
+  PendingDeliveryItem,
 } from './types/inventory';
 import {
   fetchDrawers,
   fetchItems,
   fetchTransactions,
   fetchInvoices,
+  fetchPendingDeliveries,
   checkServerHealth,
   syncBatchOperations,
 } from './api/client';
@@ -66,6 +68,7 @@ export const App: React.FC = () => {
   const [items, setItems] = useState<ItemResponse[]>([]);
   const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
   const [invoices, setInvoices] = useState<InvoiceSummaryResponse[]>([]);
+  const [pendingDeliveries, setPendingDeliveries] = useState<PendingDeliveryItem[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
@@ -154,17 +157,19 @@ export const App: React.FC = () => {
 
   const loadAllData = async () => {
     try {
-      const [d, it, tx, inv] = await Promise.all([
+      const [d, it, tx, inv, pending] = await Promise.all([
         fetchDrawers(),
         fetchItems(),
         fetchTransactions(),
         fetchInvoices().catch(() => [] as InvoiceSummaryResponse[]),
+        fetchPendingDeliveries().catch(() => [] as PendingDeliveryItem[]),
       ]);
 
       setDrawers(d);
       setItems(it);
       setTransactions(tx);
       setInvoices(inv);
+      setPendingDeliveries(pending);
       setIsOnline(true);
 
       // Save fresh copy to IndexedDB for offline resilience
@@ -298,6 +303,7 @@ export const App: React.FC = () => {
           <MobileHome
             drawers={drawers}
             items={items}
+            pendingDeliveries={pendingDeliveries}
             isOnline={isOnline}
             pendingCount={pendingCount}
             userName={userName}
@@ -312,6 +318,7 @@ export const App: React.FC = () => {
             items={items}
             transactions={transactions}
             invoices={invoices}
+            pendingDeliveries={pendingDeliveries}
             userName={userName}
             isOnline={isOnline}
             installPrompt={installPrompt}
