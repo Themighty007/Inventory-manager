@@ -1,13 +1,13 @@
 {
-  "name": "Smart Electronics Inventory",
-  "short_name": "Inventory",
+  "name": "SKR Tech's Inventory System",
+  "short_name": "SKR Tech",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#121316",
-  "theme_color": "#121316",
-  "description": "Smart Electronics Inventory Management System for Stanley 1-93-981 39-Compartment Cabinet",
+  "background_color": "#0B132B",
+  "theme_color": "#0B132B",
+  "description": "SKR Tech's Inventory System • Hardware Innovations • Stanley 39-Compartment Cabinet",
   "categories": ["productivity", "utilities", "business"],
   "icons": [
     {
@@ -29,27 +29,27 @@
       "purpose": "maskable"
     },
     {
-      "src": "/icons/icon.svg",
+      "src": "/logos/logo-symbol.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
   "shortcuts": [
     {
-      "name": "Scan Barcode",
+      "name": "Scanner",
       "url": "/?view=scanner",
-      "description": "Open camera barcode scanner"
+      "description": "Open camera barcode & QR scanner"
     },
     {
-      "name": "Stanley Cabinet",
+      "name": "Cabinet Matrix",
       "url": "/?view=cabinet",
-      "description": "View 39 storage compartments"
+      "description": "View 39 Stanley compartments"
     },
     {
-      "name": "Sync Queue",
-      "url": "/?view=queue",
-      "description": "View pending offline synchronizations"
+      "name": "Upload Invoice",
+      "url": "/?view=invoice",
+      "description": "Upload component invoice"
     }
   ]
 }

@@ -247,3 +247,11 @@ def get_all_drawer_labels(db: Session = Depends(get_db)):
 @api_router.post("/sync/batch", response_model=SyncBatchResponse, summary="Batch synchronize queued offline operations with idempotency")
 def sync_batch(batch_req: SyncBatchRequest, db: Session = Depends(get_db)):
     return InventoryService.process_batch_sync(db, batch_req)
+
+
+# ===================== NETWORK INFO =====================
+@api_router.get("/network-info", summary="Get active LAN IP addresses and mobile URLs")
+def get_network_info_endpoint():
+    from backend.app.services.network_service import get_network_info
+    from backend.app.config import settings
+    return get_network_info(http_port=settings.HTTP_PORT, https_port=settings.HTTPS_PORT)

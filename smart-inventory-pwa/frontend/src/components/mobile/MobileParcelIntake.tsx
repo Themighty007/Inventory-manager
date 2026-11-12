@@ -9,9 +9,9 @@ import {
   Layers,
   ArrowLeft,
   AlertCircle,
-  ShieldCheck,
   Clock,
   FileText,
+  Calendar,
 } from 'lucide-react';
 
 interface MobileParcelIntakeProps {
@@ -60,7 +60,7 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
     if (!initialCode) return;
     const raw = initialCode.trim();
 
-    // 1. Check if JSON payload (e.g. smart QR label or DigiKey/Mouser app payload)
+    // 1. JSON payload check
     if (raw.startsWith('{') && raw.endsWith('}')) {
       try {
         const obj = JSON.parse(raw);
@@ -93,31 +93,30 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
         }
         return;
       } catch {
-        // Not valid JSON, continue with pattern matching
+        // Not JSON
       }
     }
 
-    // 2. Direct Drawer Code or Drawer in URL: "DRAWER:S04", "S04", "https://...?drawer=S04", "drawer/S04"
+    // 2. Drawer Code or Drawer in URL
     const urlDrawerMatch = raw.match(/(?:drawer[=\/:]|#|\b)([SL]\d{2})\b/i);
     if (urlDrawerMatch) {
       const candidate = urlDrawerMatch[1].toUpperCase();
       if (drawers.some((d) => d.id === candidate)) {
         setDrawerId(candidate);
-        // If the code was ONLY the drawer (e.g. "DRAWER:S04" or "S04"), return now
         if (raw.match(/^(?:DRAWER:)?([SL]\d{2})$/i)) {
           return;
         }
       }
     }
 
-    // 3. SKU / Item Prefix, e.g. "ITEM:ESP32" or "SKU:RES-10K"
+    // 3. SKU prefix
     if (/^(?:ITEM|SKU):/i.test(raw)) {
       const parsedSku = raw.replace(/^(?:ITEM|SKU):/i, '').trim().toUpperCase();
       setSku(parsedSku);
       return;
     }
 
-    // 4. Tracking code or raw barcode
+    // 4. Default fallback: use code as tracking code and default SKU
     setTrackingCode(raw);
     setSku(raw.toUpperCase());
   }, [initialCode, drawers]);
@@ -166,7 +165,6 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
         setSubmitting(false);
       }
     } else {
-      // Offline mode: Store operation in IndexedDB with UUID
       try {
         const queuedOp = await enqueueOperation('RECEIVE', payload);
         onCompleted(
@@ -194,19 +192,24 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
     'Hardware',
   ];
 
+  const smallDrawers = Array.from({ length: 30 }, (_, i) => `S${String(i + 1).padStart(2, '0')}`);
+  const largeDrawers = Array.from({ length: 9 }, (_, i) => `L${String(i + 1).padStart(2, '0')}`);
+
   return (
-    <div className="flex flex-col h-full bg-[#F8F6F1] overflow-y-auto p-4 select-none text-[#18181B]">
+    <div className="flex flex-col h-full bg-[#F8FAFC] overflow-y-auto p-4 select-none text-slate-800 pb-16">
       {/* Top Header */}
-      <div className="flex items-center justify-between pb-3 border-b-2 border-[#18181B] mb-4">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-black text-[#18181B] hover:text-[#15803D]"
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-[#00B4D8] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Scanner
         </button>
         <span
-          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border border-[#18181B] ${
-            isOnline ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#FEF08A] text-[#713F12]'
+          className={`text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full border ${
+            isOnline
+              ? 'bg-[#2EC4B6]/10 text-[#2EC4B6] border-[#2EC4B6]/30'
+              : 'bg-amber-50 text-amber-700 border-amber-200'
           }`}
         >
           {isOnline ? 'Live Master Connected' : 'Offline Queue Mode'}
@@ -217,12 +220,12 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
         <button
           type="button"
           onClick={onSwitchToInvoice}
-          className="mb-3 p-2.5 rounded-xl bg-[#FEF9C3] border-2 border-[#18181B] flex items-center justify-between gap-2 text-left"
+          className="mb-3 p-2.5 rounded-xl bg-[#00B4D8]/10 border border-[#00B4D8]/30 flex items-center justify-between gap-2 text-left hover:bg-[#00B4D8]/15 transition-colors"
         >
-          <span className="text-[11px] font-bold text-[#713F12]">
+          <span className="text-[11px] font-semibold text-[#00B4D8]">
             Upload a PDF / Doc Invoice instead?
           </span>
-          <span className="px-2 py-0.5 rounded-lg bg-[#18181B] text-[#FEF08A] text-[10px] font-black flex items-center gap-1 shrink-0">
+          <span className="px-2.5 py-0.5 rounded-lg bg-[#00B4D8] text-white text-[10px] font-semibold flex items-center gap-1 shrink-0">
             <FileText className="w-3 h-3" /> Auto-Extract →
           </span>
         </button>
@@ -230,208 +233,254 @@ export const MobileParcelIntake: React.FC<MobileParcelIntakeProps> = ({
 
       {/* Scanned Badge Banner */}
       {trackingCode && (
-        <div className="p-3 bg-white border-2 border-[#18181B] rounded-xl shadow-[2px_2px_0px_#18181B] flex items-center justify-between mb-4">
+        <div className="p-3 bg-white border border-slate-200 rounded-xl shadow-xs flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#FEF08A] text-[#18181B] flex items-center justify-center font-bold border border-[#18181B]">
+            <div className="w-8 h-8 rounded-lg bg-[#00B4D8]/10 text-[#00B4D8] flex items-center justify-center font-bold">
               <Barcode className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-[10px] text-[#71717A] uppercase font-mono block">
-                SCANNED PARCEL / BARCODE
+              <span className="text-[10px] text-slate-400 uppercase font-mono block">
+                SCANNED CODE / IDENTIFIER
               </span>
-              <span className="text-xs font-mono font-black text-[#18181B]">{trackingCode}</span>
+              <span className="text-xs font-mono font-bold text-[#0B132B]">
+                {trackingCode}
+              </span>
             </div>
           </div>
-          <span className="text-[10px] font-bold text-[#15803D] bg-[#DCFCE7] px-2 py-0.5 rounded border border-[#86EFAC]">
-            Scanned
-          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setTrackingCode('');
+              setSku('');
+            }}
+            className="text-[10px] text-slate-400 hover:text-slate-600 underline"
+          >
+            Clear
+          </button>
         </div>
       )}
 
       {errorMsg && (
-        <div className="p-3 bg-[#FEE2E2] border-2 border-[#B91C1C] rounded-xl text-xs font-bold text-[#B91C1C] flex items-center gap-2 mb-4">
+        <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium flex items-center gap-2 mb-3">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Registration Form */}
-      <form onSubmit={handleSubmit} className="space-y-4 pb-12">
-        <div className="bg-white p-4 rounded-2xl border-2 border-[#18181B] shadow-[3px_3px_0px_#18181B] space-y-3">
-          <div className="text-xs font-black uppercase tracking-wider text-[#71717A] pb-1 border-b border-[#E4E4E7]">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* COMPONENT INFORMATION */}
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
             Component Information
-          </div>
+          </span>
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="text-[10px] font-black text-[#18181B] block mb-1">PART SKU *</label>
+              <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
+                Part SKU *
+              </label>
               <input
                 type="text"
+                placeholder="e.g. ESP32-WROOM-32"
                 value={sku}
                 onChange={(e) => setSku(e.target.value.toUpperCase())}
-                placeholder="Enter or scan SKU..."
-                className="w-full p-2.5 text-xs font-mono font-black rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
+                className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-slate-300 focus:outline-none focus:border-[#00B4D8] bg-slate-50/50"
                 required
               />
             </div>
             <div>
-              <label className="text-[10px] font-black text-[#18181B] block mb-1">QUANTITY *</label>
+              <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
+                Quantity *
+              </label>
               <input
                 type="number"
-                min={1}
+                min="1"
+                placeholder="1"
                 value={quantity}
-                onChange={(e) => setQuantity(e.target.value === '' ? '' : parseInt(e.target.value) || 1)}
-                placeholder="Qty"
-                className="w-full p-2.5 text-xs font-mono font-black rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-full p-2 text-xs font-mono font-bold rounded-lg border border-slate-300 focus:outline-none focus:border-[#00B4D8] bg-slate-50/50"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="text-[10px] font-black text-[#18181B] block mb-1">ITEM DESCRIPTION</label>
+            <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
+              Item Description
+            </label>
             <input
               type="text"
+              placeholder="e.g. Dual-Core Wi-Fi & BLE Microcontroller"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Component description / part name (optional)..."
-              className="w-full p-2.5 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
+              className="w-full p-2 text-xs font-medium rounded-lg border border-slate-300 focus:outline-none focus:border-[#00B4D8] bg-slate-50/50"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="text-[10px] font-black text-[#18181B] block mb-1">CATEGORY</label>
+              <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
+                Category
+              </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-2.5 text-xs font-bold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA]"
+                className="w-full p-2 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50/50 focus:outline-none focus:border-[#00B4D8]"
               >
                 {categories.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-black text-[#18181B] block mb-1">UNIT PRICE (₹)</label>
+              <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
+                Unit Price (₹)
+              </label>
               <input
                 type="number"
-                min={0}
+                step="0.01"
+                placeholder="e.g. 250"
                 value={unitPrice}
-                onChange={(e) => setUnitPrice(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
-                placeholder="Optional (₹)"
-                className="w-full p-2.5 text-xs font-mono font-bold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
+                onChange={(e) => setUnitPrice(e.target.value)}
+                className="w-full p-2 text-xs font-mono font-medium rounded-lg border border-slate-300 focus:outline-none focus:border-[#00B4D8] bg-slate-50/50"
               />
             </div>
           </div>
         </div>
 
-        {/* Physical Drawer Assignment */}
-        <div className="bg-white p-4 rounded-2xl border-2 border-[#18181B] shadow-[3px_3px_0px_#18181B] space-y-3">
-          <div className="flex items-center justify-between pb-1 border-b border-[#E4E4E7]">
-            <span className="text-xs font-black uppercase tracking-wider text-[#71717A]">
-              Cabinet Compartment *
+        {/* STANLEY CABINET COMPARTMENT */}
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Stanley Cabinet Compartment *
             </span>
             {drawerId ? (
-              <span className="font-mono text-xs font-black bg-[#86EFAC] text-[#064E3B] px-2 py-0.5 rounded border border-[#18181B]">
-                ✓ Selected: {drawerId}
+              <span className="font-mono text-[11px] font-bold bg-[#00B4D8]/10 text-[#00B4D8] px-2.5 py-0.5 rounded-full border border-[#00B4D8]/20">
+                Selected: {drawerId}
               </span>
             ) : (
-              <span className="font-mono text-xs font-black bg-[#FEF08A] text-[#713F12] px-2 py-0.5 rounded border border-[#18181B] animate-pulse">
-                ⚠️ Tap to Select
+              <span className="text-[10px] text-amber-600 font-semibold animate-pulse">
+                Select Compartment
               </span>
             )}
           </div>
 
-          <p className="text-[11px] text-[#71717A]">
-            {drawerId ? `Item will be stored in Compartment ${drawerId}. Tap any other box to change:` : 'Tap any compartment below to assign this item:'}
+          <p className="text-[11px] text-slate-500 font-medium">
+            Tap any compartment to assign this parcel:
           </p>
 
-          <div className="grid grid-cols-6 gap-1 max-h-36 overflow-y-auto p-1.5 bg-[#FAFAFA] border-2 border-[#18181B] rounded-xl">
-            {drawers.map((d) => (
+          {/* Large Drawers L01-L09 */}
+          <div className="grid grid-cols-6 gap-1">
+            {largeDrawers.map((id) => (
               <button
+                key={id}
                 type="button"
-                key={d.id}
-                onClick={() => setDrawerId(d.id)}
-                className={`py-1.5 rounded-lg border font-mono font-black text-[11px] transition-all ${
-                  drawerId === d.id
-                    ? 'bg-[#18181B] text-[#86EFAC] border-[#18181B] shadow-[1px_1px_0px_#18181B] scale-105'
-                    : d.is_occupied
-                    ? 'bg-[#FEF08A] text-[#18181B] border-[#18181B]'
-                    : 'bg-white text-[#71717A] border-[#D4D4D8]'
+                onClick={() => setDrawerId(id)}
+                className={`py-1.5 px-0.5 text-center font-mono text-[11px] font-bold rounded-lg border transition-all ${
+                  drawerId === id
+                    ? 'bg-[#00B4D8] text-white border-[#00B4D8] shadow-xs'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                {d.id}
+                {id}
+              </button>
+            ))}
+          </div>
+
+          {/* Small Drawers S01-S30 */}
+          <div className="grid grid-cols-6 gap-1 pt-1">
+            {smallDrawers.map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setDrawerId(id)}
+                className={`py-1 px-0.5 text-center font-mono text-[10px] font-bold rounded-lg border transition-all ${
+                  drawerId === id
+                    ? 'bg-[#0B132B] text-[#00B4D8] border-[#0B132B] shadow-xs'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {id}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Invoice & Supplier */}
-        <div className="bg-white p-4 rounded-2xl border-2 border-[#18181B] shadow-[3px_3px_0px_#18181B] space-y-3">
-          <div className="text-xs font-black uppercase tracking-wider text-[#71717A] pb-1 border-b border-[#E4E4E7]">
-            Procurement & Tracking Details (Optional)
+        {/* PROCUREMENT & TRACKING DETAILS */}
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-3">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+            Procurement & Tracking Details
+          </span>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
+                Supplier
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Mouser, Robu"
+                value={supplier}
+                onChange={(e) => setSupplier(e.target.value)}
+                className="w-full p-2 text-xs font-medium rounded-lg border border-slate-300 focus:outline-none focus:border-[#00B4D8] bg-slate-50/50"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
+                Invoice #
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. INV-2026-001"
+                value={invoice}
+                onChange={(e) => setInvoice(e.target.value)}
+                className="w-full p-2 text-xs font-mono font-medium rounded-lg border border-slate-300 focus:outline-none focus:border-[#00B4D8] bg-slate-50/50"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="text-[10px] font-black text-[#18181B] block mb-1">SUPPLIER</label>
-              <input
-                type="text"
-                value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
-                placeholder="Vendor name..."
-                className="w-full p-2.5 text-xs font-semibold rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-[#18181B] block mb-1">INVOICE #</label>
-              <input
-                type="text"
-                value={invoice}
-                onChange={(e) => setInvoice(e.target.value)}
-                placeholder="Bill / Invoice ref..."
-                className="w-full p-2.5 text-xs font-mono rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] placeholder-[#A1A1AA]"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-[#18181B] block mb-1">ORDER DATE</label>
+              <label className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-600 mb-1">
+                <Calendar className="w-3 h-3 text-[#00B4D8]" /> Order Date
+              </label>
               <input
                 type="date"
                 value={orderDate}
                 onChange={(e) => setOrderDate(e.target.value)}
-                className="w-full p-2.5 text-xs font-mono font-bold rounded-lg border-2 border-[#18181B] bg-[#FEF9C3]"
+                className="w-full p-2 text-xs font-mono font-medium rounded-lg border border-slate-300 focus:outline-none focus:border-[#00B4D8] bg-slate-50/50"
               />
             </div>
             <div>
-              <label className="text-[10px] font-black text-[#18181B] block mb-1">ARRIVAL TIME</label>
+              <label className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-600 mb-1">
+                <Clock className="w-3 h-3 text-[#2EC4B6]" /> Delivery Time
+              </label>
               <input
                 type="datetime-local"
                 value={deliveryTime}
                 onChange={(e) => setDeliveryTime(e.target.value)}
-                className="w-full p-2.5 text-[11px] font-mono font-bold rounded-lg border-2 border-[#18181B] bg-[#DCFCE7]"
+                className="w-full p-2 text-xs font-mono font-medium rounded-lg border border-slate-300 focus:outline-none focus:border-[#2EC4B6] bg-slate-50/50"
               />
             </div>
           </div>
         </div>
 
-        {/* Submit Confirmation Button */}
+        {/* SUBMIT BUTTON */}
         <button
           type="submit"
           disabled={submitting}
-          className="w-full brutal-btn brutal-btn-mint py-3.5 text-xs font-black uppercase tracking-wider text-[#064E3B] shadow-[3px_3px_0px_#18181B] flex items-center justify-center gap-2"
+          className="w-full btn-teal py-3.5 px-4 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 shadow-sm disabled:opacity-40"
         >
-          {isOnline ? (
-            <>
-              <CheckCircle className="w-4 h-4" />
-              {submitting ? 'Registering to Master...' : drawerId ? `Confirm Intake → Drawer ${drawerId}` : 'Select a Compartment to Confirm'}
-            </>
-          ) : (
-            <>
-              <Clock className="w-4 h-4" />
-              {submitting ? 'Storing in IndexedDB...' : drawerId ? `Queue Offline Intake → Drawer ${drawerId}` : 'Select a Compartment to Confirm'}
-            </>
-          )}
+          <CheckCircle className="w-4 h-4" />
+          <span>
+            {submitting
+              ? 'Registering Component...'
+              : drawerId
+              ? `Confirm Intake → Drawer ${drawerId}`
+              : 'Select Drawer Compartment'}
+          </span>
         </button>
       </form>
     </div>

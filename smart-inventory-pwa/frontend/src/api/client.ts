@@ -220,3 +220,9 @@ export async function fetchInvoiceDetail(invoiceId: number): Promise<InvoiceSumm
   if (!res.ok) throw new Error('Failed to load invoice detail');
   return res.json();
 }
+
+export async function fetchNetworkInfo(): Promise<import('../types/inventory').NetworkInfo> {
+  const res = await fetch(`${BASE_URL}/api/network-info`);
+  if (!res.ok) throw new Error('Failed to fetch network information');
+  return res.json();
+}

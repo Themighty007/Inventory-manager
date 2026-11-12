@@ -1,7 +1,8 @@
 @echo off
-title Smart Electronics Inventory Manager
+title SKR Tech's Inventory System
 echo ======================================================================
-echo   STARTING SMART ELECTRONICS INVENTORY MANAGEMENT SYSTEM (PWA)
+echo   STARTING SKR TECH'S INVENTORY SYSTEM (PWA)
+echo   Hardware Innovations - Stanley 39-Compartment Storage
 echo ======================================================================
 echo.
 
@@ -21,11 +22,18 @@ if %ERRORLEVEL% neq 0 (
     echo [WARNING] Failed to install dependencies via pip. Attempting to start anyway...
 )
 
-REM 3. Launch default browser to localhost after 2 seconds
+REM 3. Ensure Windows Firewall permits incoming LAN connections on ports 8000 & 8443
+netsh advfirewall firewall show rule name="SKR Tech Inventory System (HTTP 8000)" >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    netsh advfirewall firewall add rule name="SKR Tech Inventory System (HTTP 8000)" dir=in action=allow protocol=TCP localport=8000 profile=any >nul 2>nul
+    netsh advfirewall firewall add rule name="SKR Tech Inventory System (HTTPS 8443)" dir=in action=allow protocol=TCP localport=8443 profile=any >nul 2>nul
+)
+
+REM 4. Launch default browser to localhost after 2 seconds
 start "" cmd /c "timeout /t 2 /nobreak >nul & start http://localhost:8000"
 
-REM 4. Run the dual HTTP & HTTPS server
-echo [INFO] Starting Dual HTTP and HTTPS Server...
+REM 5. Run the dual HTTP & HTTPS server
+echo [INFO] Starting SKR Tech Dual HTTP & HTTPS Server...
 python run_server.py
 
 pause

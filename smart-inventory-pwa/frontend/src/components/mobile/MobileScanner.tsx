@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   SwitchCamera,
   ZoomIn,
-  Maximize2,
   Focus,
 } from 'lucide-react';
 
@@ -53,15 +52,25 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
   const isComponentMounted = useRef<boolean>(true);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Formats for ZXing fallback engine
+  // All 1D and 2D formats for ZXing fallback engine
   const formatsToSupport = [
     Html5QrcodeSupportedFormats.QR_CODE,
     Html5QrcodeSupportedFormats.CODE_128,
     Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.CODE_93,
+    Html5QrcodeSupportedFormats.CODABAR,
+    Html5QrcodeSupportedFormats.ITF,
     Html5QrcodeSupportedFormats.EAN_13,
     Html5QrcodeSupportedFormats.EAN_8,
     Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.PDF_417,
     Html5QrcodeSupportedFormats.DATA_MATRIX,
+    Html5QrcodeSupportedFormats.AZTEC,
+    Html5QrcodeSupportedFormats.MAXICODE,
+    Html5QrcodeSupportedFormats.RSS_14,
+    Html5QrcodeSupportedFormats.RSS_EXPANDED,
+    Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
   ];
 
   // Synthesized double chime on target lock (880 Hz -> 1320 Hz)
@@ -141,16 +150,33 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
     }, 250);
   }, [onScanResult, playSuccessChime, triggerHaptic]);
 
-  // High-frequency frame scanner using jsQR + native BarcodeDetector
+  // High-frequency frame scanner using native BarcodeDetector + jsQR fallback
   const startFrameDetectionLoop = useCallback(() => {
     let nativeDetector: any = null;
     if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
       try {
-        nativeDetector = new (window as any).BarcodeDetector({
-          formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'upc_a', 'data_matrix'],
-        });
+        const allSupported = [
+          'qr_code',
+          'code_128',
+          'code_39',
+          'code_93',
+          'codabar',
+          'data_matrix',
+          'ean_13',
+          'ean_8',
+          'itf',
+          'pdf417',
+          'upc_a',
+          'upc_e',
+          'aztec',
+        ];
+        nativeDetector = new (window as any).BarcodeDetector({ formats: allSupported });
       } catch {
-        nativeDetector = null;
+        try {
+          nativeDetector = new (window as any).BarcodeDetector();
+        } catch {
+          nativeDetector = null;
+        }
       }
     }
 
@@ -174,8 +200,8 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
         const vh = video.videoHeight;
         frameCount++;
 
-        // Pass 1: Hardware-accelerated BarcodeDetector (if available)
-        if (nativeDetector && frameCount % 2 === 0) {
+        // Pass 1: Hardware-accelerated BarcodeDetector (Runs on EVERY frame for all 1D/2D barcodes)
+        if (nativeDetector) {
           try {
             const detected = await nativeDetector.detect(video);
             if (detected && detected.length > 0 && detected[0].rawValue) {
@@ -190,7 +216,6 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
         // Pass 2: jsQR Ultra-Precision Engine
         // Analyzes frames with inversionAttempts: 'attemptBoth'
         try {
-          // Downsample slightly if video is 1080p+ to keep CPU latency < 8ms
           let targetW = vw;
           let targetH = vh;
           if (targetW > 1200) {
@@ -204,7 +229,6 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
           ctx.drawImage(video, 0, 0, targetW, targetH);
           const imgData = ctx.getImageData(0, 0, targetW, targetH);
 
-          // Fast inverted + normal QR code scan
           const qrResult = jsQR(imgData.data, targetW, targetH, {
             inversionAttempts: 'attemptBoth',
           });
@@ -215,7 +239,7 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
           }
 
           // Pass 3: Center crop scan at 1:1 sensor resolution for distant or tiny QR codes
-          if (vw > 600 && vh > 600 && frameCount % 3 === 0) {
+          if (vw > 600 && vh > 600 && frameCount % 2 === 0) {
             const cropSize = Math.min(vw, vh, 500);
             const cropX = Math.round((vw - cropSize) / 2);
             const cropY = Math.round((vh - cropSize) / 2);
@@ -223,8 +247,19 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
             canvas.width = cropSize;
             canvas.height = cropSize;
             ctx.drawImage(video, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
-            const centerData = ctx.getImageData(0, 0, cropSize, cropSize);
 
+            // Also test native detector on the center crop for dense 1D barcodes
+            if (nativeDetector) {
+              try {
+                const detectedCenter = await nativeDetector.detect(canvas);
+                if (detectedCenter && detectedCenter.length > 0 && detectedCenter[0].rawValue) {
+                  handleScanSuccess(detectedCenter[0].rawValue);
+                  return;
+                }
+              } catch {}
+            }
+
+            const centerData = ctx.getImageData(0, 0, cropSize, cropSize);
             const centerQr = jsQR(centerData.data, cropSize, cropSize, {
               inversionAttempts: 'attemptBoth',
             });
@@ -277,7 +312,6 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
       try {
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length > 0) {
-          // Sort cameras: prioritize rear/back cameras, deprioritize front and 0.5x ultra-wide
           const sorted = [...devices].sort((a, b) => {
             const labelA = a.label.toLowerCase();
             const labelB = b.label.toLowerCase();
@@ -294,92 +328,86 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
         console.warn('Could not enumerate cameras:', err);
       }
 
-      // WebRTC camera constraints: request HD resolution with continuous autofocus
       let cameraConfig: any = {
         facingMode: 'environment',
       };
 
       if (discoveredDevices.length > 0) {
-        const chosen = discoveredDevices[activeCameraIndex % discoveredDevices.length];
+        const chosen = discoveredDevices[activeCameraIndex] || discoveredDevices[0];
         cameraConfig = { deviceId: { exact: chosen.id } };
       }
 
-      // Start Html5Qrcode with 25 FPS scan rate
+      const qrConfig = {
+        fps: 25,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minDim = Math.min(viewfinderWidth, viewfinderHeight);
+          const edge = Math.floor(minDim * 0.85);
+          return { width: edge, height: edge };
+        },
+        aspectRatio: 1.0,
+      };
+
       await qrCode.start(
         cameraConfig,
-        {
-          fps: 25,
-          disableFlip: false,
+        qrConfig,
+        (decodedText) => {
+          handleScanSuccess(decodedText);
         },
-        handleScanSuccess,
-        () => {}
+        () => {
+          // Frame without barcode - ignore to prevent console flooding
+        }
       );
 
       setIsScanning(true);
-
-      // Start parallel high-frequency jsQR & native detector loop
       startFrameDetectionLoop();
 
-      // Configure hardware track features: continuous autofocus, torch & zoom
+      // Check capabilities (torch, zoom, autofocus)
       try {
-        const track = (qrCode as any).getRunningTrack?.() as MediaStreamTrack;
-        if (track) {
-          const caps: any = track.getCapabilities?.() || {};
-
-          // Apply continuous autofocus if available
-          if (caps.focusMode && (caps.focusMode.includes('continuous') || caps.focusMode.includes('single-shot'))) {
-            track.applyConstraints({
-              advanced: [{ focusMode: 'continuous' } as any],
-            }).catch(() => {});
-          }
-
-          // Check torch capability
-          setHasTorch(Boolean(caps.torch));
-
-          // Check zoom capability
+        const track = (qrCode as any).getRunningTrack();
+        if (track && typeof track.getCapabilities === 'function') {
+          const caps = track.getCapabilities();
+          if (caps.torch) setHasTorch(true);
           if (caps.zoom) {
             setSupportsZoom(true);
-            const zMin = caps.zoom.min || 1;
-            const zMax = Math.min(4, caps.zoom.max || 3);
-            setCurrentZoom(zMin);
-            setMaxZoom(zMax);
-          } else {
-            setSupportsZoom(false);
+            setMaxZoom(caps.zoom.max || 2);
+            setCurrentZoom(caps.zoom.min || 1);
           }
         }
-      } catch (trackErr) {
-        console.warn('Track capability probe:', trackErr);
+      } catch (e) {
+        console.warn('Could not read track capabilities:', e);
       }
     } catch (err: any) {
-      console.warn('Camera initialization error:', err);
+      console.error('Failed to start camera:', err);
       setIsScanning(false);
       stopFrameDetectionLoop();
 
-      if (err?.name === 'NotAllowedError' || err?.message?.includes('Permission')) {
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes('NotAllowedError') || errMsg.includes('Permission')) {
         setCameraError(
-          'Camera access was denied. Please allow camera permissions in your mobile browser settings, or use Image Upload / Manual Entry below.'
+          'Camera access was denied by your browser. Please tap the lock / settings icon in your browser address bar and enable Camera permissions for this site.'
         );
-      } else if (err?.name === 'NotFoundError') {
-        setCameraError('No camera device detected on this hardware.');
-      } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      } else if (errMsg.includes('NotFoundError') || errMsg.includes('OverconstrainedError')) {
         setCameraError(
-          'Mobile browsers require HTTPS to access the camera over local Wi-Fi. Access this app via https://192.168.29.243:8443'
+          'Rear camera could not be bound. You can use the Photo tab to snap/upload an image or type the code manually.'
         );
       } else {
-        setCameraError(err?.message || 'Could not start camera. Try switching camera or using Image Upload / Manual Entry.');
+        setCameraError(
+          `Unable to start camera scanner: ${errMsg}. Use Photo or Type mode below.`
+        );
       }
     }
   };
 
   const stopScanner = async () => {
     stopFrameDetectionLoop();
-
-    if (scannerRef.current && scannerRef.current.isScanning) {
+    if (scannerRef.current) {
       try {
-        await scannerRef.current.stop();
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
         await scannerRef.current.clear();
       } catch (err) {
-        console.warn('Error stopping scanner:', err);
+        console.warn('Error clearing scanner instance:', err);
       }
     }
     setIsScanning(false);
@@ -396,160 +424,158 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
 
     return () => {
       isComponentMounted.current = false;
-      stopScanner();
+      stopFrameDetectionLoop();
+      if (scannerRef.current && scannerRef.current.isScanning) {
+        scannerRef.current.stop().catch(() => {});
+      }
     };
   }, [activeTab, activeCameraIndex]);
 
+  // Flashlight / Torch toggle
   const toggleTorch = async () => {
     if (!scannerRef.current || !hasTorch) return;
     try {
-      const nextState = !torchOn;
-      await (scannerRef.current as any).applyVideoConstraints({
-        advanced: [{ torch: nextState }],
-      });
-      setTorchOn(nextState);
+      const track = (scannerRef.current as any).getRunningTrack();
+      if (track && typeof track.applyConstraints === 'function') {
+        const nextState = !torchOn;
+        await track.applyConstraints({
+          advanced: [{ torch: nextState } as any],
+        });
+        setTorchOn(nextState);
+      }
     } catch (err) {
-      console.warn('Failed to toggle torch:', err);
+      console.warn('Failed to toggle flashlight:', err);
     }
   };
 
+  // Switch camera between multiple rear/front lenses
+  const handleSwitchCamera = async () => {
+    if (cameras.length <= 1) return;
+    await stopScanner();
+    setActiveCameraIndex((prev) => (prev + 1) % cameras.length);
+  };
+
+  // Zoom control
   const handleToggleZoom = async () => {
     if (!scannerRef.current || !supportsZoom) return;
     try {
-      const nextZoom = currentZoom === 1 ? Math.min(2, maxZoom) : 1;
-      const track = (scannerRef.current as any).getRunningTrack?.() as MediaStreamTrack;
-      if (track) {
+      const track = (scannerRef.current as any).getRunningTrack();
+      if (track && typeof track.applyConstraints === 'function') {
+        const nextZoom = currentZoom >= 2 ? 1 : Math.min(2, maxZoom);
         await track.applyConstraints({
           advanced: [{ zoom: nextZoom } as any],
         });
         setCurrentZoom(nextZoom);
       }
     } catch (err) {
-      console.warn('Zoom adjustment notice:', err);
+      console.warn('Zoom failed:', err);
     }
   };
 
-  const handleSwitchCamera = () => {
-    if (cameras.length <= 1) return;
-    stopScanner().then(() => {
-      setActiveCameraIndex((prev) => (prev + 1) % cameras.length);
-    });
-  };
-
-  // Interactive tap-to-focus on camera viewfinder
-  const handleViewfinderTap = async (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const rect = target.getBoundingClientRect();
-    const clientX = 'touches' in e && e.touches.length > 0 ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = 'touches' in e && e.touches.length > 0 ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
+  // Tap on viewfinder to trigger autofocus & show focus ring
+  const handleViewfinderTap = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     setFocusRing({ x, y });
-    setTimeout(() => setFocusRing(null), 1200);
+    setTimeout(() => setFocusRing(null), 800);
 
-    // Apply continuous focus constraint to camera track
     try {
-      const track = (scannerRef.current as any)?.getRunningTrack?.() as MediaStreamTrack;
-      if (track) {
-        const normX = Math.max(0, Math.min(1, x / rect.width));
-        const normY = Math.max(0, Math.min(1, y / rect.height));
-        const caps: any = track.getCapabilities?.() || {};
-        if (caps.focusMode) {
-          await track.applyConstraints({
-            advanced: [{
-              focusMode: 'continuous',
-              pointsOfInterest: [{ x: normX, y: normY }],
-            } as any],
-          });
-        }
+      const track = (scannerRef.current as any)?.getRunningTrack();
+      if (track && typeof track.applyConstraints === 'function') {
+        track.applyConstraints({
+          advanced: [{ focusMode: 'continuous' } as any],
+        }).catch(() => {});
       }
-    } catch {
-      // Tap focus completed
-    }
+    } catch {}
   };
 
-  // High-precision photo upload scan with dual jsQR + Html5Qrcode
+  // Image Upload fallback scanner
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadFeedback('Scanning high-resolution photo...');
+    setUploadFeedback('Analyzing image for QR codes & barcodes...');
 
-    // Method 1: Instant jsQR analysis on loaded Image bitmap
-    try {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('Image load failed'));
-        img.src = objectUrl;
-      });
-
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (ctx) {
-        ctx.drawImage(img, 0, 0);
-        const data = ctx.getImageData(0, 0, img.width, img.height);
-        const qrResult = jsQR(data.data, img.width, img.height, {
-          inversionAttempts: 'attemptBoth',
-        });
-
-        URL.revokeObjectURL(objectUrl);
-
-        if (qrResult && qrResult.data) {
-          playSuccessChime();
-          triggerHaptic();
-          setUploadFeedback(`✓ Detected: ${qrResult.data}`);
-          handleScanSuccess(qrResult.data);
+    // 1. Try native BarcodeDetector on image bitmap
+    if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+      try {
+        const detector = new (window as any).BarcodeDetector();
+        const bitmap = await createImageBitmap(file);
+        const results = await detector.detect(bitmap);
+        if (results && results.length > 0 && results[0].rawValue) {
+          setUploadFeedback(`Found: ${results[0].rawValue}`);
+          handleScanSuccess(results[0].rawValue);
           return;
         }
+      } catch (err) {
+        console.warn('Native BarcodeDetector on photo failed, trying fallback:', err);
       }
-      URL.revokeObjectURL(objectUrl);
-    } catch (err) {
-      console.warn('jsQR image upload probe note:', err);
     }
 
-    // Method 2: Html5Qrcode ZXing fallback
+    // 2. Try jsQR with normal + inverted attempts
     try {
-      if (!scannerRef.current) {
-        scannerRef.current = new Html5Qrcode('qr-reader', {
-          formatsToSupport,
-          verbose: false,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true,
-          },
-        });
-      }
+      const img = new Image();
+      const reader = new FileReader();
 
-      const decoded = await scannerRef.current.scanFile(file, true);
-      if (decoded) {
-        playSuccessChime();
-        triggerHaptic();
-        setUploadFeedback(`✓ Detected: ${decoded}`);
-        handleScanSuccess(decoded.trim());
-        return;
-      }
+      reader.onload = (loadEvent) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            setUploadFeedback('Failed to initialize image processor.');
+            return;
+          }
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'attemptBoth',
+          });
+
+          if (code && code.data) {
+            setUploadFeedback(`Found: ${code.data}`);
+            handleScanSuccess(code.data);
+          } else {
+            // 3. Fallback to html5-qrcode file scanner
+            if (scannerRef.current) {
+              scannerRef.current
+                .scanFile(file, true)
+                .then((decodedText) => {
+                  setUploadFeedback(`Found: ${decodedText}`);
+                  handleScanSuccess(decodedText);
+                })
+                .catch(() => {
+                  setUploadFeedback(
+                    'No barcode or QR code found in this photo. Try taking a closer, sharper photo with good lighting or enter the code manually.'
+                  );
+                });
+            } else {
+              setUploadFeedback(
+                'No barcode detected. Ensure the label is clear, unblurred, and well-lit.'
+              );
+            }
+          }
+        };
+        img.src = loadEvent.target?.result as string;
+      };
+      reader.readAsDataURL(file);
     } catch {
-      setUploadFeedback('Could not detect a clear code. Try holding closer, taking another photo, or typing it below.');
+      setUploadFeedback('Error reading photo file.');
     }
   };
 
-  // Manual code submission
+  // Manual code entry fallback
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (manualCode.trim()) {
-      playSuccessChime();
-      triggerHaptic();
-      handleScanSuccess(manualCode.trim().toUpperCase());
-    }
+    const clean = manualCode.trim();
+    if (!clean) return;
+    handleScanSuccess(clean);
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#121316] text-white p-4 select-none">
+    <div className="flex flex-col h-full bg-[#0B132B] text-white p-4 select-none">
       {/* Hidden file input for photo upload */}
       <input
         type="file"
@@ -560,18 +586,18 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
       />
 
       {/* Top Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-[#27272A] mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-[#FEF08A] text-[#18181B] flex items-center justify-center font-black border-2 border-[#18181B]">
-            <Barcode className="w-4 h-4 text-[#18181B]" />
+      <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/30 flex items-center justify-center font-bold">
+            <Barcode className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-black text-white tracking-tight">
+            <h2 className="text-sm font-display font-bold text-white tracking-tight">
               Barcode & QR Scanner
             </h2>
-            <span className="text-[10px] text-[#86EFAC] font-mono flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#86EFAC] animate-pulse" />
-              Ultra-Precision jsQR Engine
+            <span className="text-[10px] text-[#2EC4B6] font-mono flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6] animate-pulse" />
+              All 1D & 2D Barcode Engine Active
             </span>
           </div>
         </div>
@@ -579,7 +605,7 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
         {onCancel && (
           <button
             onClick={onCancel}
-            className="px-2.5 py-1 text-xs font-bold rounded-lg border border-[#3F3F46] bg-[#27272A] text-[#D4D4D8]"
+            className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white transition-colors"
           >
             Cancel
           </button>
@@ -587,13 +613,13 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
       </div>
 
       {/* Mode Switcher */}
-      <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#1C1D22] border-2 border-[#27272A] rounded-xl mb-3 text-xs font-bold">
+      <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#1E293B]/70 border border-slate-700/60 rounded-xl mb-3 text-xs font-semibold">
         <button
           onClick={() => setActiveTab('CAMERA')}
           className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
             activeTab === 'CAMERA'
-              ? 'bg-[#86EFAC] text-[#064E3B] shadow-[1px_1px_0px_#18181B]'
-              : 'text-[#A1A1AA] hover:text-white'
+              ? 'bg-[#00B4D8] text-white shadow-xs font-bold'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           <Camera className="w-3.5 h-3.5" /> Camera
@@ -602,8 +628,8 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
           onClick={() => setActiveTab('UPLOAD')}
           className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
             activeTab === 'UPLOAD'
-              ? 'bg-[#FEF08A] text-[#713F12] shadow-[1px_1px_0px_#18181B]'
-              : 'text-[#A1A1AA] hover:text-white'
+              ? 'bg-[#00B4D8] text-white shadow-xs font-bold'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           <Upload className="w-3.5 h-3.5" /> Photo
@@ -612,8 +638,8 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
           onClick={() => setActiveTab('MANUAL')}
           className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all ${
             activeTab === 'MANUAL'
-              ? 'bg-[#DDD6FE] text-[#4C1D95] shadow-[1px_1px_0px_#18181B]'
-              : 'text-[#A1A1AA] hover:text-white'
+              ? 'bg-[#00B4D8] text-white shadow-xs font-bold'
+              : 'text-slate-400 hover:text-white'
           }`}
         >
           <Keyboard className="w-3.5 h-3.5" /> Type
@@ -626,7 +652,7 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
           {/* Target Container for camera stream & visual targeting reticle */}
           <div
             onClick={handleViewfinderTap}
-            className="w-full max-w-sm rounded-2xl overflow-hidden border-2 border-[#86EFAC] bg-black shadow-xl relative min-h-[260px] flex items-center justify-center cursor-pointer"
+            className="w-full max-w-sm rounded-2xl overflow-hidden border border-[#00B4D8]/40 bg-black shadow-2xl relative min-h-[260px] flex items-center justify-center cursor-pointer"
             title="Tap anywhere to refocus"
           >
             {/* Camera feed */}
@@ -635,18 +661,18 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
             {/* High-Precision Viewfinder Reticle Overlay */}
             {isScanning && !scannedFeedback && (
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
-                <div className="relative w-52 h-52 border border-dashed border-[#86EFAC]/40 rounded-2xl flex items-center justify-center">
+                <div className="relative w-52 h-52 border border-dashed border-[#00B4D8]/30 rounded-2xl flex items-center justify-center">
                   {/* Four Corner Brackets */}
-                  <div className="absolute top-0 left-0 w-7 h-7 border-t-4 border-l-4 border-[#86EFAC] rounded-tl-xl" />
-                  <div className="absolute top-0 right-0 w-7 h-7 border-t-4 border-r-4 border-[#86EFAC] rounded-tr-xl" />
-                  <div className="absolute bottom-0 left-0 w-7 h-7 border-b-4 border-l-4 border-[#86EFAC] rounded-bl-xl" />
-                  <div className="absolute bottom-0 right-0 w-7 h-7 border-b-4 border-r-4 border-[#86EFAC] rounded-br-xl" />
+                  <div className="absolute top-0 left-0 w-7 h-7 border-t-2 border-l-2 border-[#00B4D8] rounded-tl-xl" />
+                  <div className="absolute top-0 right-0 w-7 h-7 border-t-2 border-r-2 border-[#00B4D8] rounded-tr-xl" />
+                  <div className="absolute bottom-0 left-0 w-7 h-7 border-b-2 border-l-2 border-[#00B4D8] rounded-bl-xl" />
+                  <div className="absolute bottom-0 right-0 w-7 h-7 border-b-2 border-r-2 border-[#00B4D8] rounded-br-xl" />
 
                   {/* Animated Sweeping Laser Line */}
-                  <div className="absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-[#86EFAC] to-transparent shadow-[0_0_10px_#86EFAC] animate-bounce" />
+                  <div className="absolute left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-[#00B4D8] to-transparent shadow-[0_0_8px_#00B4D8] animate-bounce" />
 
                   {/* Central Target Aim Dot */}
-                  <div className="w-2 h-2 rounded-full bg-[#86EFAC] animate-ping" />
+                  <div className="w-2 h-2 rounded-full bg-[#00B4D8] animate-ping" />
                 </div>
               </div>
             )}
@@ -654,19 +680,19 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
             {/* Tap-to-Focus Ring Indicator */}
             {focusRing && (
               <div
-                className="absolute pointer-events-none w-12 h-12 -ml-6 -mt-6 border-2 border-[#FEF08A] rounded-full animate-ping z-30"
+                className="absolute pointer-events-none w-12 h-12 -ml-6 -mt-6 border-2 border-[#2EC4B6] rounded-full animate-ping z-30"
                 style={{ left: focusRing.x, top: focusRing.y }}
               />
             )}
 
             {/* Scanned Success Flash Banner */}
             {scannedFeedback && (
-              <div className="absolute inset-0 bg-[#86EFAC]/95 flex flex-col items-center justify-center p-4 z-30 animate-in fade-in zoom-in-95">
-                <CheckCircle2 className="w-14 h-14 text-[#064E3B] mb-2" />
-                <span className="text-xs font-black uppercase text-[#064E3B] tracking-wider">
+              <div className="absolute inset-0 bg-[#0B132B]/95 border-2 border-[#2EC4B6] flex flex-col items-center justify-center p-4 z-30 animate-in fade-in zoom-in-95">
+                <CheckCircle2 className="w-14 h-14 text-[#2EC4B6] mb-2" />
+                <span className="text-xs font-bold uppercase text-[#2EC4B6] tracking-wider">
                   Target Identified!
                 </span>
-                <span className="font-mono text-base font-black text-[#121316] mt-2 bg-white px-4 py-1.5 rounded-xl border-2 border-[#18181B] shadow-[2px_2px_0px_#18181B]">
+                <span className="font-mono text-base font-bold text-white mt-2 bg-[#1E293B] px-4 py-1.5 rounded-xl border border-slate-700 shadow-md">
                   {scannedFeedback}
                 </span>
               </div>
@@ -680,7 +706,7 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
                     e.stopPropagation();
                     handleToggleZoom();
                   }}
-                  className="px-2.5 py-1.5 rounded-full border-2 border-[#18181B] bg-black/75 text-[#FEF08A] font-mono font-black text-xs shadow-lg flex items-center gap-1"
+                  className="px-2.5 py-1.5 rounded-full border border-slate-700 bg-black/75 text-[#00B4D8] font-mono font-bold text-xs shadow-lg flex items-center gap-1"
                   title="Toggle Zoom (1x / 2x)"
                 >
                   <ZoomIn className="w-3.5 h-3.5" />
@@ -694,7 +720,7 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
                     e.stopPropagation();
                     handleSwitchCamera();
                   }}
-                  className="p-2.5 rounded-full border-2 border-[#18181B] bg-black/75 text-white shadow-lg"
+                  className="p-2.5 rounded-full border border-slate-700 bg-black/75 text-white shadow-lg hover:text-[#00B4D8] transition-colors"
                   title={`Switch Lens (${activeCameraIndex + 1}/${cameras.length})`}
                 >
                   <SwitchCamera className="w-4 h-4" />
@@ -707,8 +733,8 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
                     e.stopPropagation();
                     toggleTorch();
                   }}
-                  className={`p-2.5 rounded-full border-2 border-[#18181B] shadow-lg ${
-                    torchOn ? 'bg-[#FEF08A] text-[#18181B]' : 'bg-black/75 text-white'
+                  className={`p-2.5 rounded-full border border-slate-700 shadow-lg transition-colors ${
+                    torchOn ? 'bg-[#00B4D8] text-white' : 'bg-black/75 text-white'
                   }`}
                   title="Toggle Flashlight / Torch"
                 >
@@ -720,8 +746,8 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
             {/* Tap hint footer */}
             {isScanning && !scannedFeedback && (
               <div className="absolute bottom-2 inset-x-0 text-center pointer-events-none">
-                <span className="text-[9px] font-mono font-bold bg-black/60 text-[#86EFAC] px-2.5 py-0.5 rounded-full border border-[#86EFAC]/30">
-                  ⚡ Auto-finding QR • Tap screen to focus
+                <span className="text-[9px] font-mono font-medium bg-black/60 text-[#00B4D8] px-2.5 py-0.5 rounded-full border border-[#00B4D8]/30">
+                  ⚡ Auto-detecting 1D & 2D Barcodes • Tap to focus
                 </span>
               </div>
             )}
@@ -729,26 +755,26 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
 
           {/* Camera Permission / Notice Banner */}
           {cameraError && (
-            <div className="p-3.5 bg-[#27272A] border-2 border-[#FCA5A5] rounded-xl text-xs space-y-2 max-w-sm text-center my-2">
-              <div className="flex items-center justify-center gap-2 text-[#FCA5A5] font-black">
+            <div className="p-3.5 bg-[#1E293B] border border-red-400/40 rounded-xl text-xs space-y-2 max-w-sm text-center my-2">
+              <div className="flex items-center justify-center gap-2 text-red-400 font-bold">
                 <CameraOff className="w-4 h-4" />
                 <span>Camera Notice</span>
               </div>
-              <p className="text-[#D4D4D8] leading-relaxed text-[11px]">
+              <p className="text-slate-300 leading-relaxed text-[11px]">
                 {cameraError}
               </p>
               <div className="flex items-center justify-center gap-2 pt-1">
                 <button
                   onClick={startScanner}
-                  className="brutal-btn brutal-btn-mint text-xs py-1 px-3 text-[#064E3B]"
+                  className="btn-cyan text-xs py-1 px-3"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" /> Retry Camera
+                  <RefreshCw className="w-3.5 h-3.5 inline mr-1" /> Retry Camera
                 </button>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="brutal-btn brutal-btn-yellow text-xs py-1 px-3 text-[#713F12]"
+                  className="py-1 px-3 rounded-lg border border-slate-600 bg-slate-700 text-slate-200 text-xs font-semibold"
                 >
-                  <Upload className="w-3.5 h-3.5" /> Snap Photo
+                  <Upload className="w-3.5 h-3.5 inline mr-1" /> Snap Photo
                 </button>
               </div>
             </div>
@@ -757,18 +783,18 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
           {/* Quick Manual Entry Bar Directly Below Camera */}
           <form
             onSubmit={handleManualSubmit}
-            className="w-full max-w-sm mt-3 pt-2 border-t border-[#27272A] flex items-center gap-2"
+            className="w-full max-w-sm mt-3 pt-2 border-t border-slate-800 flex items-center gap-2"
           >
             <input
               type="text"
               placeholder="Or type/paste code (e.g. S01, ESP32)..."
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
-              className="flex-1 px-3 py-2 text-xs font-mono font-bold rounded-xl bg-[#23252B] border-2 border-[#3F3F46] text-white placeholder-[#71717A] focus:outline-none focus:border-[#86EFAC]"
+              className="flex-1 px-3 py-2 text-xs font-mono font-medium rounded-xl bg-[#1E293B] border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-[#00B4D8]"
             />
             <button
               type="submit"
-              className="brutal-btn brutal-btn-mint text-xs py-2 px-3 text-[#064E3B]"
+              className="btn-cyan py-2 px-3 text-xs rounded-xl flex items-center justify-center"
               title="Submit Code"
             >
               <ArrowRight className="w-4 h-4" />
@@ -780,28 +806,28 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
       {/* VIEW 2: PHOTO / FILE UPLOAD FALLBACK */}
       {activeTab === 'UPLOAD' && (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-[#FEF08A] text-[#18181B] flex items-center justify-center border-2 border-[#18181B] shadow-[2px_2px_0px_#18181B]">
-            <Upload className="w-8 h-8" />
+          <div className="w-14 h-14 rounded-2xl bg-[#00B4D8]/10 text-[#00B4D8] flex items-center justify-center border border-[#00B4D8]/20">
+            <Upload className="w-7 h-7" />
           </div>
 
           <div>
-            <h3 className="text-sm font-black text-white uppercase">
+            <h3 className="text-sm font-display font-bold text-white">
               Scan from Photo or Gallery
             </h3>
-            <p className="text-xs text-[#A1A1AA] mt-1 max-w-xs">
+            <p className="text-xs text-slate-400 mt-1 max-w-xs">
               Snap a clear photo or select an image containing a compartment QR or component barcode.
             </p>
           </div>
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="brutal-btn brutal-btn-mint text-xs py-2.5 px-6 text-[#064E3B]"
+            className="btn-cyan text-xs py-2.5 px-6 rounded-xl"
           >
             Select Photo / Take Picture
           </button>
 
           {uploadFeedback && (
-            <div className="p-3 rounded-xl bg-[#27272A] border border-[#3F3F46] text-xs font-mono text-[#FEF08A] max-w-xs">
+            <div className="p-3 rounded-xl bg-[#1E293B] border border-slate-700 text-xs font-mono text-[#00B4D8] max-w-xs">
               {uploadFeedback}
             </div>
           )}
@@ -813,19 +839,19 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
         <div className="flex-1 flex flex-col justify-center p-4 max-w-sm mx-auto w-full">
           <form onSubmit={handleManualSubmit} className="space-y-4">
             <div className="text-center space-y-1">
-              <div className="w-12 h-12 rounded-2xl bg-[#DDD6FE] text-[#4C1D95] mx-auto flex items-center justify-center border-2 border-[#18181B]">
+              <div className="w-12 h-12 rounded-2xl bg-[#00B4D8]/10 text-[#00B4D8] mx-auto flex items-center justify-center border border-[#00B4D8]/20">
                 <Keyboard className="w-6 h-6" />
               </div>
-              <h3 className="text-sm font-black text-white uppercase">
+              <h3 className="text-sm font-display font-bold text-white">
                 Manual Code Entry
               </h3>
-              <p className="text-xs text-[#A1A1AA]">
+              <p className="text-xs text-slate-400">
                 Type any Drawer Compartment (e.g. S01, L04) or Component SKU
               </p>
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase text-[#A1A1AA] block mb-1">
+              <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">
                 Enter Code / Identifier
               </label>
               <input
@@ -833,7 +859,7 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 placeholder="e.g. S01 or ESP32-WROOM-32"
-                className="w-full p-3 text-sm font-mono font-black rounded-xl bg-[#23252B] border-2 border-[#3F3F46] text-white focus:outline-none focus:border-[#86EFAC]"
+                className="w-full p-3 text-sm font-mono font-bold rounded-xl bg-[#1E293B] border border-slate-700 text-white focus:outline-none focus:border-[#00B4D8]"
                 autoFocus
                 required
               />
@@ -841,7 +867,7 @@ export const MobileScanner: React.FC<MobileScannerProps> = ({
 
             <button
               type="submit"
-              className="w-full brutal-btn brutal-btn-mint py-3 text-xs font-black uppercase text-[#064E3B] flex items-center justify-center gap-2"
+              className="w-full btn-cyan py-3 text-xs font-semibold rounded-xl flex items-center justify-center gap-2"
             >
               Continue to Intake <ArrowRight className="w-4 h-4" />
             </button>

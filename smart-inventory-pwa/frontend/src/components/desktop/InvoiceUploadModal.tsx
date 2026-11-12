@@ -18,6 +18,7 @@ import {
   Grid,
   Plus,
   Minus,
+  RotateCcw,
 } from 'lucide-react';
 
 interface InvoiceUploadModalProps {
@@ -54,6 +55,10 @@ const getLocalDateTimeString = () => {
     now.getHours()
   )}:${pad(now.getMinutes())}`;
 };
+
+function round2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
 
 export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
   isOpen,
@@ -246,35 +251,35 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
   return (
     <div className="modal-overlay" onClick={handleClose}>
       <div
-        className="brutal-card bg-white w-full max-w-6xl p-6 relative max-h-[92vh] flex flex-col"
+        className="skr-card bg-white w-full max-w-6xl p-6 relative max-h-[92vh] flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b-2 border-[#18181B] mb-4 shrink-0">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-4 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#FEF08A] border-2 border-[#18181B] flex items-center justify-center">
-              <FileText className="w-5 h-5 text-[#18181B]" />
+            <div className="w-10 h-10 rounded-xl bg-[#00B4D8]/10 text-[#00B4D8] border border-[#00B4D8]/20 flex items-center justify-center">
+              <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black uppercase text-[#18181B] tracking-tight">
-                Upload Invoice / Packing Document
+              <h3 className="text-base font-display font-bold text-[#0B132B] tracking-tight">
+                Upload Component Invoice / Packing Document
               </h3>
-              <p className="text-xs text-[#71717A] font-semibold">
+              <p className="text-xs text-slate-500 font-medium">
                 Auto-extracts component Name, SKU, Quantity, Order Date & Delivery Time from PDF, DOCX, CSV, TXT, or JSON
               </p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-lg border-2 border-[#18181B] flex items-center justify-center hover:bg-[#F4F4F5]"
+            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100 text-slate-500 transition-colors"
           >
-            <X className="w-4 h-4 text-[#18181B]" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 bg-[#FEE2E2] border-2 border-[#B91C1C] rounded-xl text-xs font-bold text-[#991B1B] flex items-start gap-2 shrink-0">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700 flex items-start gap-2 shrink-0">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -297,36 +302,36 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
               onDragLeave={() => setDragActive(false)}
               onDrop={handleDrop}
               onClick={() => !parsing && fileInputRef.current?.click()}
-              className={`border-3 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
+              className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
                 dragActive
-                  ? 'border-[#18181B] bg-[#DCFCE7]'
-                  : 'border-[#18181B] bg-[#FAF9F5] hover:bg-[#FEF9C3]'
+                  ? 'border-[#00B4D8] bg-[#00B4D8]/10'
+                  : 'border-slate-300 bg-slate-50 hover:bg-[#00B4D8]/5 hover:border-[#00B4D8]/50'
               }`}
             >
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#86EFAC] border-2 border-[#18181B] shadow-[3px_3px_0px_#18181B] flex items-center justify-center">
-                <Upload className="w-8 h-8 text-[#064E3B]" />
+              <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-[#00B4D8]/10 border border-[#00B4D8]/20 flex items-center justify-center text-[#00B4D8]">
+                <Upload className="w-7 h-7" />
               </div>
 
               {parsing ? (
                 <div className="space-y-2">
-                  <div className="text-base font-black text-[#18181B] uppercase">
+                  <div className="text-sm font-display font-bold text-[#0B132B]">
                     Extracting Component Table & Invoice Dates...
                   </div>
-                  <p className="text-xs text-[#52525B] font-semibold">
+                  <p className="text-xs text-slate-500 font-medium">
                     Analyzing spatial columns, part SKUs, HSN boundaries, tax totals, and order date
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <div className="text-base font-black text-[#18181B] uppercase">
+                  <div className="text-sm font-display font-bold text-[#0B132B]">
                     Drop Invoice PDF / Document Here or Click to Browse
                   </div>
-                  <p className="text-xs text-[#52525B] font-semibold max-w-xl mx-auto">
+                  <p className="text-xs text-slate-500 font-medium max-w-xl mx-auto">
                     Supports Robu.in, Mouser, DigiKey, LCSC, Amazon Business & custom component invoices in{' '}
-                    <span className="font-mono font-bold text-[#18181B]">.PDF, .DOCX, .CSV, .TXT, .JSON</span>
+                    <span className="font-mono font-semibold text-slate-700">.PDF, .DOCX, .CSV, .TXT, .JSON</span>
                   </p>
                   <div className="pt-3">
-                    <span className="inline-flex items-center gap-2 brutal-btn brutal-btn-mint text-xs py-2 px-5">
+                    <span className="btn-cyan inline-flex items-center gap-2 py-2 px-5 text-xs font-semibold rounded-xl">
                       <Upload className="w-4 h-4" /> Choose Invoice File
                     </span>
                   </div>
@@ -335,21 +340,21 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
             </div>
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-              <div className="p-3 rounded-xl border-2 border-[#18181B] bg-white">
-                <div className="font-black text-[#18181B] uppercase mb-1">1. Auto-Extract</div>
-                <p className="text-[#52525B] font-medium">
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-xs">
+                <div className="font-display font-bold text-[#0B132B] mb-1">1. Auto-Extract</div>
+                <p className="text-slate-500 font-medium leading-relaxed">
                   Reads Name, SKU, Quantity, Unit Cost & Order Date straight from multi-page invoices, skipping shipping fees.
                 </p>
               </div>
-              <div className="p-3 rounded-xl border-2 border-[#18181B] bg-white">
-                <div className="font-black text-[#18181B] uppercase mb-1">2. Confirm Qty & Compartment</div>
-                <p className="text-[#52525B] font-medium">
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-xs">
+                <div className="font-display font-bold text-[#0B132B] mb-1">2. Confirm Qty & Compartment</div>
+                <p className="text-slate-500 font-medium leading-relaxed">
                   Prompts only for final physical Quantity check and which Stanley drawer (S01–S30, L01–L09) each item enters.
                 </p>
               </div>
-              <div className="p-3 rounded-xl border-2 border-[#18181B] bg-white">
-                <div className="font-black text-[#18181B] uppercase mb-1">3. Atomic Audit Log</div>
-                <p className="text-[#52525B] font-medium">
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-xs">
+                <div className="font-display font-bold text-[#0B132B] mb-1">3. Atomic Audit Log</div>
+                <p className="text-slate-500 font-medium leading-relaxed">
                   Logs all items, stock lots, invoice record, Order Date & Delivery/Arrival Time in one database commit.
                 </p>
               </div>
@@ -361,21 +366,21 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
         {step === 'REVIEW' && parsedDoc && (
           <div className="flex-1 overflow-y-auto pr-1 space-y-4">
             {/* Extracted Document Metadata */}
-            <div className="p-4 rounded-xl border-2 border-[#18181B] bg-[#FAF9F5]">
+            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/80">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-[#DDD6FE] border border-[#18181B] font-mono font-black text-[10px] text-[#4C1D95]">
+                  <span className="px-2.5 py-0.5 rounded-md bg-[#00B4D8]/10 border border-[#00B4D8]/30 font-mono font-bold text-[10px] text-[#00B4D8]">
                     {parsedDoc.file_type} • {parsedDoc.filename}
                   </span>
                   {parsedDoc.total_amount > 0 && (
-                    <span className="px-2 py-0.5 rounded bg-[#DCFCE7] border border-[#18181B] font-mono font-bold text-[10px] text-[#166534]">
+                    <span className="px-2.5 py-0.5 rounded-md bg-[#2EC4B6]/10 border border-[#2EC4B6]/30 font-mono font-bold text-[10px] text-[#2EC4B6]">
                       Subtotal {parsedDoc.currency} {parsedDoc.subtotal_amount.toFixed(2)} + Tax{' '}
                       {parsedDoc.tax_amount.toFixed(2)} = Total {parsedDoc.total_amount.toFixed(2)}
                     </span>
                   )}
                   {parsedDoc.skipped_fee_rows.length > 0 && (
                     <span
-                      className="px-2 py-0.5 rounded bg-[#FEF08A] border border-[#18181B] font-mono font-bold text-[10px] text-[#713F12]"
+                      className="px-2.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 font-mono font-bold text-[10px] text-amber-700"
                       title={parsedDoc.skipped_fee_rows.map((f) => f.name).join(', ')}
                     >
                       {parsedDoc.skipped_fee_rows.length} fee/shipping row skipped
@@ -386,37 +391,37 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                 <button
                   type="button"
                   onClick={() => resetModal()}
-                  className="text-xs font-bold underline text-[#18181B] hover:text-[#065F46]"
+                  className="text-xs font-semibold text-[#00B4D8] hover:underline flex items-center gap-1"
                 >
-                  Upload a different file
+                  <RotateCcw className="w-3.5 h-3.5" /> Upload a different file
                 </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-[#52525B] mb-1">
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
                     Supplier
                   </label>
                   <input
                     type="text"
                     value={supplier}
                     onChange={(e) => setSupplier(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border-2 border-[#18181B] bg-white text-xs font-bold"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold focus:outline-none focus:border-[#00B4D8]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-[#52525B] mb-1">
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
                     Invoice # *
                   </label>
                   <input
                     type="text"
                     value={invoiceNumber}
                     onChange={(e) => setInvoiceNumber(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border-2 border-[#18181B] bg-white text-xs font-mono font-bold"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono font-bold focus:outline-none focus:border-[#00B4D8]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-[#52525B] mb-1">
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
                     Sale Order #
                   </label>
                   <input
@@ -424,29 +429,29 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                     value={saleOrderNumber}
                     onChange={(e) => setSaleOrderNumber(e.target.value)}
                     placeholder="Optional"
-                    className="w-full px-2.5 py-1.5 rounded-lg border-2 border-[#18181B] bg-white text-xs font-mono font-bold"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono font-semibold focus:outline-none focus:border-[#00B4D8]"
                   />
                 </div>
                 <div>
-                  <label className="flex items-center gap-1 text-[10px] font-black uppercase text-[#18181B] mb-1">
-                    <Calendar className="w-3 h-3" /> Order Date
+                  <label className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-600 mb-1">
+                    <Calendar className="w-3 h-3 text-[#00B4D8]" /> Order Date
                   </label>
                   <input
                     type="date"
                     value={orderDate}
                     onChange={(e) => setOrderDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border-2 border-[#18181B] bg-[#FEF9C3] text-xs font-mono font-bold"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono font-semibold focus:outline-none focus:border-[#00B4D8]"
                   />
                 </div>
                 <div>
-                  <label className="flex items-center gap-1 text-[10px] font-black uppercase text-[#18181B] mb-1">
-                    <Clock className="w-3 h-3" /> Delivery / Arrival Time
+                  <label className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-600 mb-1">
+                    <Clock className="w-3 h-3 text-[#2EC4B6]" /> Delivery / Arrival Time
                   </label>
                   <input
                     type="datetime-local"
                     value={deliveryTime}
                     onChange={(e) => setDeliveryTime(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border-2 border-[#18181B] bg-[#DCFCE7] text-xs font-mono font-bold"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-mono font-semibold focus:outline-none focus:border-[#2EC4B6]"
                   />
                 </div>
               </div>
@@ -454,20 +459,20 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
 
             {/* Warnings & Duplicate Check */}
             {(parsedDoc.warnings.length > 0 || parsedDoc.already_logged) && (
-              <div className="p-3 rounded-xl border-2 border-[#D97706] bg-[#FEF3C7] text-xs text-[#92400E] space-y-1.5">
+              <div className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-800 space-y-1.5">
                 {parsedDoc.warnings.map((w, idx) => (
-                  <div key={idx} className="flex items-start gap-2 font-semibold">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <div key={idx} className="flex items-start gap-2 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
                     <span>{w}</span>
                   </div>
                 ))}
                 {parsedDoc.already_logged && (
-                  <label className="flex items-center gap-2 pt-1 font-black cursor-pointer text-[#78350F]">
+                  <label className="flex items-center gap-2 pt-1 font-bold cursor-pointer text-amber-900">
                     <input
                       type="checkbox"
                       checked={allowDuplicateAppend}
                       onChange={(e) => setAllowDuplicateAppend(e.target.checked)}
-                      className="w-4 h-4 accent-[#18181B]"
+                      className="w-4 h-4 accent-[#00B4D8]"
                     />
                     <span>
                       Append another batch to existing invoice {invoiceNumber} anyway
@@ -478,20 +483,20 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
             )}
 
             {/* Quick Bulk Assignment Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border-2 border-[#18181B] bg-white">
-              <div className="flex items-center gap-2 text-xs font-black text-[#18181B]">
-                <Layers className="w-4 h-4 text-[#065F46]" />
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-white">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#0B132B]">
+                <Layers className="w-4 h-4 text-[#00B4D8]" />
                 <span>
                   {assignedCount} / {selectedRows.length} Compartments Assigned • {totalUnitsToCommit} Total Units
                 </span>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold text-[#52525B]">Quick Compartment Fill:</span>
+                <span className="text-[11px] font-medium text-slate-500">Quick Compartment Fill:</span>
                 <select
                   value={bulkDrawer}
                   onChange={(e) => setBulkDrawer(e.target.value)}
-                  className="px-2.5 py-1 rounded-lg border-2 border-[#18181B] bg-[#FAFAFA] text-xs font-mono font-bold"
+                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-50 text-xs font-mono font-semibold focus:outline-none focus:border-[#00B4D8]"
                 >
                   {allDrawerIds.map((id) => (
                     <option key={id} value={id}>
@@ -502,14 +507,14 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                 <button
                   type="button"
                   onClick={applyDrawerToAllUnassigned}
-                  className="px-2.5 py-1 rounded-lg border-2 border-[#18181B] bg-[#FEF08A] hover:bg-[#FDE047] text-[11px] font-black"
+                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-[11px] font-semibold text-slate-700"
                 >
                   Fill Unassigned ({unassignedCount})
                 </button>
                 <button
                   type="button"
                   onClick={applyDrawerToAllSelected}
-                  className="px-2.5 py-1 rounded-lg border-2 border-[#18181B] bg-[#F4F4F5] hover:bg-[#E4E4E7] text-[11px] font-bold"
+                  className="px-2.5 py-1 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 text-[11px] font-semibold text-slate-700"
                 >
                   Set All ({selectedRows.length})
                 </button>
@@ -517,36 +522,36 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
             </div>
 
             {/* Extracted Component Table */}
-            <div className="overflow-x-auto border-2 border-[#18181B] rounded-xl">
+            <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-xs">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-[#FAF9F5] border-b-2 border-[#18181B] text-[10px] font-black uppercase text-[#18181B]">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
                     <th className="py-2.5 px-3 w-8 text-center">LOG</th>
                     <th className="py-2.5 px-3 min-w-[110px]">SKU</th>
                     <th className="py-2.5 px-3 min-w-[260px]">COMPONENT NAME & CATEGORY</th>
-                    <th className="py-2.5 px-3 min-w-[135px] bg-[#FEF9C3] border-x border-[#18181B]">
+                    <th className="py-2.5 px-3 min-w-[135px] bg-[#00B4D8]/5 border-x border-slate-200 text-[#00B4D8]">
                       QUANTITY *
                     </th>
-                    <th className="py-2.5 px-3 min-w-[205px] bg-[#DCFCE7] border-r border-[#18181B]">
+                    <th className="py-2.5 px-3 min-w-[205px] bg-[#2EC4B6]/5 border-r border-slate-200 text-[#2EC4B6]">
                       COMPARTMENT (DRAWER) *
                     </th>
                     <th className="py-2.5 px-3 text-right min-w-[85px]">UNIT ₹</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y-2 divide-[#18181B] bg-white">
+                <tbody className="divide-y divide-slate-100">
                   {rows.map((row, idx) => {
                     const missingDrawer = row.selected && !row.assignedDrawer;
                     return (
                       <tr
                         key={`${row.line_no}-${row.sku}`}
-                        className={!row.selected ? 'opacity-45 bg-[#F4F4F5]' : 'hover:bg-[#FBF9F5]'}
+                        className={!row.selected ? 'opacity-40 bg-slate-50' : 'hover:bg-slate-50/60'}
                       >
                         <td className="py-2.5 px-3 text-center">
                           <input
                             type="checkbox"
                             checked={row.selected}
                             onChange={(e) => updateRow(idx, { selected: e.target.checked })}
-                            className="w-4 h-4 accent-[#18181B] cursor-pointer"
+                            className="w-4 h-4 accent-[#00B4D8] cursor-pointer"
                           />
                         </td>
 
@@ -558,10 +563,10 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                             onChange={(e) =>
                               updateRow(idx, { sku: e.target.value.toUpperCase() })
                             }
-                            className="w-full px-2 py-1 rounded border border-[#18181B] font-mono font-bold text-xs bg-[#FAFAFA]"
+                            className="w-full px-2 py-1 rounded border border-slate-200 font-mono font-bold text-xs bg-slate-50 focus:bg-white focus:border-[#00B4D8]"
                           />
                           {row.hsn_code && (
-                            <div className="text-[10px] font-mono text-[#71717A] mt-0.5">
+                            <div className="text-[10px] font-mono text-slate-400 mt-0.5">
                               HSN {row.hsn_code}
                             </div>
                           )}
@@ -573,14 +578,14 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                             value={row.name}
                             disabled={!row.selected}
                             onChange={(e) => updateRow(idx, { name: e.target.value })}
-                            className="w-full px-2 py-1 rounded border border-[#18181B] font-semibold text-xs bg-white"
+                            className="w-full px-2 py-1 rounded border border-slate-200 font-medium text-xs bg-white focus:border-[#00B4D8]"
                           />
                           <div className="flex items-center gap-2">
                             <select
                               value={row.category}
                               disabled={!row.selected}
                               onChange={(e) => updateRow(idx, { category: e.target.value })}
-                              className="px-2 py-0.5 rounded border border-[#18181B] bg-[#FAF9F5] text-[10px] font-bold"
+                              className="px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-[10px] font-medium"
                             >
                               {CATEGORIES.map((c) => (
                                 <option key={c} value={c}>
@@ -589,7 +594,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                               ))}
                             </select>
                             {row.existing_drawers.length > 0 && (
-                              <span className="px-1.5 py-0.5 rounded bg-[#DBEAFE] border border-[#3B82F6] text-[#1E40AF] text-[10px] font-bold">
+                              <span className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-medium">
                                 In stock: {row.existing_drawers.join(', ')}
                               </span>
                             )}
@@ -597,7 +602,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                         </td>
 
                         {/* Prompted Quantity */}
-                        <td className="py-2.5 px-3 bg-[#FEFCE8] border-x border-[#18181B]">
+                        <td className="py-2.5 px-3 bg-[#00B4D8]/5 border-x border-slate-200">
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
@@ -605,9 +610,9 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                               onClick={() =>
                                 updateRow(idx, { quantity: Math.max(1, row.quantity - 1) })
                               }
-                              className="w-7 h-7 rounded border-2 border-[#18181B] bg-white flex items-center justify-center hover:bg-[#FEF08A] disabled:opacity-40"
+                              className="w-7 h-7 rounded border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-100 disabled:opacity-40"
                             >
-                              <Minus className="w-3 h-3" />
+                              <Minus className="w-3 h-3 text-slate-600" />
                             </button>
                             <input
                               type="number"
@@ -619,23 +624,23 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                                   quantity: Math.max(1, parseInt(e.target.value) || 1),
                                 })
                               }
-                              className="w-16 text-center py-1 rounded border-2 border-[#18181B] bg-white font-mono font-black text-sm"
+                              className="w-16 text-center py-1 rounded border border-slate-200 bg-white font-mono font-bold text-xs focus:border-[#00B4D8]"
                             />
                             <button
                               type="button"
                               disabled={!row.selected}
                               onClick={() => updateRow(idx, { quantity: row.quantity + 1 })}
-                              className="w-7 h-7 rounded border-2 border-[#18181B] bg-white flex items-center justify-center hover:bg-[#FEF08A]"
+                              className="w-7 h-7 rounded border border-slate-200 bg-white flex items-center justify-center hover:bg-slate-100"
                             >
-                              <Plus className="w-3 h-3" />
+                              <Plus className="w-3 h-3 text-slate-600" />
                             </button>
                           </div>
                         </td>
 
                         {/* Prompted Compartment / Drawer */}
                         <td
-                          className={`py-2.5 px-3 border-r border-[#18181B] ${
-                            missingDrawer ? 'bg-[#FEE2E2]' : 'bg-[#F0FDF4]'
+                          className={`py-2.5 px-3 border-r border-slate-200 ${
+                            missingDrawer ? 'bg-red-50/70' : 'bg-[#2EC4B6]/5'
                           }`}
                         >
                           <div className="flex items-center gap-1.5">
@@ -645,10 +650,10 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                               onChange={(e) =>
                                 updateRow(idx, { assignedDrawer: e.target.value })
                               }
-                              className={`flex-1 px-2 py-1.5 rounded-lg border-2 font-mono font-black text-xs ${
+                              className={`flex-1 px-2 py-1.5 rounded-lg border font-mono font-bold text-xs ${
                                 missingDrawer
-                                  ? 'border-[#B91C1C] bg-white text-[#991B1B]'
-                                  : 'border-[#18181B] bg-white text-[#18181B]'
+                                  ? 'border-red-300 bg-white text-red-600'
+                                  : 'border-slate-200 bg-white text-slate-800'
                               }`}
                             >
                               <option value="">-- Select Drawer --</option>
@@ -671,15 +676,15 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                               type="button"
                               disabled={!row.selected}
                               onClick={() => setPickerRowIdx(pickerRowIdx === idx ? null : idx)}
-                              className="p-1.5 rounded-lg border-2 border-[#18181B] bg-[#FEF08A] hover:bg-[#FDE047]"
+                              className="p-1.5 rounded-lg border border-slate-200 bg-slate-100 hover:bg-[#00B4D8]/10 text-slate-700 hover:text-[#00B4D8] transition-colors"
                               title="Pick from 39-compartment visual cabinet grid"
                             >
-                              <Grid className="w-3.5 h-3.5 text-[#18181B]" />
+                              <Grid className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
 
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-xs">
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-xs">
                           <input
                             type="number"
                             min={0}
@@ -691,7 +696,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                                 effective_unit_cost: parseFloat(e.target.value) || 0,
                               })
                             }
-                            className="w-20 text-right px-1.5 py-1 rounded border border-[#18181B] bg-[#FAFAFA] font-mono text-xs"
+                            className="w-20 text-right px-1.5 py-1 rounded border border-slate-200 bg-slate-50 font-mono text-xs focus:bg-white focus:border-[#00B4D8]"
                           />
                         </td>
                       </tr>
@@ -703,21 +708,21 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
 
             {/* Interactive 39-Compartment Mini Cabinet Popover for Active Row */}
             {pickerRowIdx !== null && rows[pickerRowIdx] && (
-              <div className="p-4 rounded-xl border-2 border-[#18181B] bg-[#FFFBEB] shadow-[4px_4px_0px_#18181B]">
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 shadow-md">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="text-xs font-black uppercase text-[#18181B]">
+                  <div className="text-xs font-bold text-[#0B132B]">
                     Select Stanley Compartment for{' '}
-                    <span className="font-mono bg-[#FEF08A] px-2 py-0.5 rounded border border-[#18181B]">
+                    <span className="font-mono bg-[#00B4D8]/10 text-[#00B4D8] px-2 py-0.5 rounded border border-[#00B4D8]/30">
                       {rows[pickerRowIdx].sku}
                     </span>{' '}
-                    <span className="font-semibold text-[#52525B] normal-case">
+                    <span className="text-slate-500 font-normal">
                       ({rows[pickerRowIdx].name.slice(0, 50)})
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setPickerRowIdx(null)}
-                    className="text-xs font-black underline"
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline"
                   >
                     Close Grid
                   </button>
@@ -725,7 +730,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
 
                 <div className="space-y-2.5">
                   <div>
-                    <div className="text-[10px] font-black uppercase text-[#52525B] mb-1">
+                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">
                       Small Compartments (S01 – S30)
                     </div>
                     <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5">
@@ -741,12 +746,12 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                               updateRow(pickerRowIdx, { assignedDrawer: dId });
                               setPickerRowIdx(null);
                             }}
-                            className={`py-1.5 px-1 rounded-lg border-2 text-center font-mono text-[11px] font-black transition-all ${
+                            className={`py-1.5 px-1 rounded-lg border text-center font-mono text-[11px] font-semibold transition-all ${
                               isSelected
-                                ? 'bg-[#18181B] text-[#86EFAC] border-[#18181B]'
+                                ? 'bg-[#00B4D8] text-white border-[#00B4D8]'
                                 : hasItems
-                                ? 'bg-[#DCFCE7] text-[#166534] border-[#18181B] hover:bg-[#86EFAC]'
-                                : 'bg-white text-[#18181B] border-[#18181B] hover:bg-[#FEF08A]'
+                                ? 'bg-[#2EC4B6]/10 text-[#2EC4B6] border-[#2EC4B6]/30 hover:bg-[#2EC4B6]/20'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                             }`}
                           >
                             {dId}
@@ -758,7 +763,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                   </div>
 
                   <div>
-                    <div className="text-[10px] font-black uppercase text-[#52525B] mb-1">
+                    <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">
                       Large Compartments (L01 – L09)
                     </div>
                     <div className="grid grid-cols-3 sm:grid-cols-9 gap-1.5">
@@ -774,12 +779,12 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                               updateRow(pickerRowIdx, { assignedDrawer: dId });
                               setPickerRowIdx(null);
                             }}
-                            className={`py-2 px-1 rounded-lg border-2 text-center font-mono text-xs font-black transition-all ${
+                            className={`py-2 px-1 rounded-lg border text-center font-mono text-xs font-semibold transition-all ${
                               isSelected
-                                ? 'bg-[#18181B] text-[#86EFAC] border-[#18181B]'
+                                ? 'bg-[#00B4D8] text-white border-[#00B4D8]'
                                 : hasItems
-                                ? 'bg-[#FEF08A] text-[#713F12] border-[#18181B] hover:bg-[#FDE047]'
-                                : 'bg-white text-[#18181B] border-[#18181B] hover:bg-[#FEF08A]'
+                                ? 'bg-[#2EC4B6]/10 text-[#2EC4B6] border-[#2EC4B6]/30 hover:bg-[#2EC4B6]/20'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                             }`}
                           >
                             {dId}
@@ -794,7 +799,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
             )}
 
             <div>
-              <label className="block text-[10px] font-black uppercase text-[#52525B] mb-1">
+              <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
                 Optional Audit Notes
               </label>
               <input
@@ -802,7 +807,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="e.g. Received via BlueDart courier, verified physically"
-                className="w-full px-3 py-1.5 rounded-lg border-2 border-[#18181B] text-xs bg-[#FAFAFA]"
+                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:border-[#00B4D8]"
               />
             </div>
           </div>
@@ -810,14 +815,14 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
 
         {/* Sticky Footer */}
         {step === 'REVIEW' && (
-          <div className="pt-4 mt-4 border-t-2 border-[#18181B] flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <div className="text-xs font-semibold text-[#52525B]">
+          <div className="pt-4 mt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="text-xs font-medium text-slate-500">
               {unassignedCount > 0 ? (
-                <span className="text-[#B91C1C] font-black">
+                <span className="text-red-600 font-semibold">
                   Assign compartments to the remaining {unassignedCount} item(s) to enable logging.
                 </span>
               ) : (
-                <span className="text-[#166534] font-black">
+                <span className="text-[#2EC4B6] font-semibold">
                   Ready to log {selectedRows.length} component(s) ({totalUnitsToCommit} units) with Order Date{' '}
                   {orderDate || 'N/A'} & Arrival {deliveryTime.replace('T', ' ')}.
                 </span>
@@ -829,7 +834,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                 type="button"
                 onClick={handleClose}
                 disabled={committing}
-                className="brutal-btn brutal-btn-white text-xs py-2 px-4"
+                className="py-2 px-4 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-semibold transition-colors"
               >
                 Cancel
               </button>
@@ -837,7 +842,7 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
                 type="button"
                 onClick={handleCommit}
                 disabled={committing || selectedRows.length === 0 || unassignedCount > 0}
-                className="brutal-btn brutal-btn-mint text-xs py-2 px-5 disabled:opacity-50"
+                className="btn-cyan py-2 px-5 text-xs font-semibold rounded-xl flex items-center gap-2 disabled:opacity-40"
               >
                 <CheckCircle className="w-4 h-4" />
                 {committing
@@ -851,7 +856,3 @@ export const InvoiceUploadModal: React.FC<InvoiceUploadModalProps> = ({
     </div>
   );
 };
-
-function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}

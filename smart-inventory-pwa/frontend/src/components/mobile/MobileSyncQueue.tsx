@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  ArrowRight,
   Wifi,
   WifiOff,
   Trash2,
@@ -49,14 +48,12 @@ export const MobileSyncQueue: React.FC<MobileSyncQueueProps> = ({
     setLastSyncResult(null);
 
     try {
-      // Mark as SYNCING in IndexedDB
       for (const op of queue) {
         await updateOperationStatus(op.client_op_id, 'SYNCING');
       }
 
       const res = await syncBatchOperations(queue);
 
-      // Process results and remove confirmed operations
       for (const r of res.results) {
         if (r.status === 'CONFIRMED' || r.status === 'ALREADY_CONFIRMED') {
           await removeOperation(r.client_op_id);
@@ -71,7 +68,6 @@ export const MobileSyncQueue: React.FC<MobileSyncQueueProps> = ({
       onSyncCompleted();
     } catch (err: any) {
       setLastSyncResult(`Sync failed: ${err.message}. Retrying when connection stabilizes.`);
-      // Reset to PENDING
       for (const op of queue) {
         await updateOperationStatus(op.client_op_id, 'PENDING');
       }
@@ -89,18 +85,18 @@ export const MobileSyncQueue: React.FC<MobileSyncQueueProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#F8F6F1] overflow-y-auto p-4 select-none text-[#18181B] pb-12">
+    <div className="flex flex-col h-full bg-[#F8FAFC] overflow-y-auto p-4 select-none text-slate-800 pb-16">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b-2 border-[#18181B] mb-4">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-[#93C5FD] text-[#1E3A8A] flex items-center justify-center font-bold border-2 border-[#18181B]">
+          <div className="w-8 h-8 rounded-xl bg-[#00B4D8]/10 text-[#00B4D8] flex items-center justify-center font-bold border border-[#00B4D8]/20">
             <Database className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-black text-[#18181B] tracking-tight">
+            <h2 className="text-sm font-display font-bold text-[#0B132B]">
               Offline Pending Queue
             </h2>
-            <span className="text-[10px] text-[#71717A] font-mono">
+            <span className="text-[10px] text-slate-400 font-mono">
               IndexedDB • Guaranteed Idempotency
             </span>
           </div>
@@ -108,30 +104,32 @@ export const MobileSyncQueue: React.FC<MobileSyncQueueProps> = ({
 
         <button
           onClick={loadQueue}
-          className="p-1.5 rounded-lg border border-[#18181B] bg-white hover:bg-[#F4F4F5]"
+          className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors"
           title="Reload queue"
         >
-          <RefreshCw className="w-3.5 h-3.5 text-[#18181B]" />
+          <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Connectivity Status Card */}
       <div
-        className={`p-3.5 rounded-xl border-2 border-[#18181B] shadow-[2px_2px_0px_#18181B] flex items-center justify-between mb-4 ${
-          isOnline ? 'bg-[#DCFCE7]' : 'bg-[#FEF08A]'
+        className={`p-3.5 rounded-xl border flex items-center justify-between mb-4 ${
+          isOnline
+            ? 'bg-[#2EC4B6]/10 border-[#2EC4B6]/30 text-[#0B132B]'
+            : 'bg-amber-50 border-amber-200 text-amber-900'
         }`}
       >
         <div className="flex items-center gap-2.5">
           {isOnline ? (
-            <Wifi className="w-5 h-5 text-[#15803D]" />
+            <Wifi className="w-5 h-5 text-[#2EC4B6]" />
           ) : (
-            <WifiOff className="w-5 h-5 text-[#713F12]" />
+            <WifiOff className="w-5 h-5 text-amber-600" />
           )}
           <div>
-            <span className="text-xs font-black block">
+            <span className="text-xs font-bold block">
               {isOnline ? 'Windows Master Online' : 'Device Working Offline'}
             </span>
-            <span className="text-[10px] text-[#52525B]">
+            <span className="text-[10px] text-slate-500">
               {isOnline
                 ? 'Ready to sync pending phone transactions.'
                 : 'Transactions safely queued in IndexedDB.'}
@@ -143,7 +141,7 @@ export const MobileSyncQueue: React.FC<MobileSyncQueueProps> = ({
           <button
             onClick={handleSyncAll}
             disabled={syncing}
-            className="brutal-btn brutal-btn-mint text-xs py-1.5 px-3 text-[#064E3B]"
+            className="btn-cyan text-xs py-1.5 px-3 rounded-lg flex items-center gap-1 font-semibold"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
             {syncing ? 'Syncing...' : 'Sync Now'}
@@ -152,75 +150,92 @@ export const MobileSyncQueue: React.FC<MobileSyncQueueProps> = ({
       </div>
 
       {lastSyncResult && (
-        <div className="p-3 bg-white border-2 border-[#18181B] rounded-xl text-xs font-bold text-[#15803D] flex items-center gap-2 mb-4 shadow-[2px_2px_0px_#18181B]">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{lastSyncResult}</span>
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 font-medium">
+          {lastSyncResult}
         </div>
       )}
 
-      {/* Queue Items List */}
-      <div className="space-y-3">
-        <div className="text-xs font-black uppercase text-[#71717A] flex items-center justify-between">
-          <span>PENDING TRANSACTIONS ({queue.length})</span>
-          <span className="text-[10px] font-mono">Status: {queue.length > 0 ? 'Action Required' : 'Clean'}</span>
+      {/* Queue Items */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+          <span>QUEUED TRANSACTIONS ({queue.length})</span>
+          {queue.length > 0 && isOnline && (
+            <span className="text-[#2EC4B6] font-mono">Auto-Sync Enabled</span>
+          )}
         </div>
 
-        {queue.length > 0 ? (
+        {queue.length === 0 ? (
+          <div className="p-8 rounded-2xl border border-dashed border-slate-300 text-center space-y-2 bg-white">
+            <CheckCircle2 className="w-10 h-10 text-[#2EC4B6] mx-auto" />
+            <h3 className="text-xs font-bold text-[#0B132B]">All Transactions Synced</h3>
+            <p className="text-[11px] text-slate-400">
+              There are no pending offline operations. All phone records match the master database.
+            </p>
+          </div>
+        ) : (
           queue.map((op) => (
             <div
               key={op.client_op_id}
-              className="p-3.5 bg-white rounded-xl border-2 border-[#18181B] shadow-[2px_2px_0px_#18181B] space-y-2"
+              className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-xs space-y-2"
             >
               <div className="flex items-center justify-between">
-                <span
-                  className={`text-[10px] font-mono font-black px-2 py-0.5 rounded border border-[#18181B] ${
-                    op.action === 'RECEIVE'
-                      ? 'bg-[#DCFCE7] text-[#166534]'
-                      : op.action === 'CONSUME'
-                      ? 'bg-[#FEE2E2] text-[#991B1B]'
-                      : 'bg-[#FEF08A] text-[#854D0E]'
-                  }`}
-                >
-                  {op.action}
-                </span>
-
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-[#71717A] font-mono flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {new Date(op.timestamp).toLocaleTimeString()}
-                  </span>
-                  <button
-                    onClick={() => handleDeleteOp(op.client_op_id)}
-                    className="p-1 hover:text-[#B91C1C]"
-                    title="Discard from queue"
+                  <span
+                    className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                      op.status === 'PENDING'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : op.status === 'SYNCING'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                    }`}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                    {op.status}
+                  </span>
+                  <span className="font-mono text-xs font-bold text-[#0B132B]">
+                    {op.action || op.op_type}
+                  </span>
                 </div>
+
+                <button
+                  onClick={() => handleDeleteOp(op.client_op_id)}
+                  className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  title="Remove from queue"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              <div className="text-xs font-mono font-bold text-[#18181B]">
-                {op.action === 'INVOICE_COMMIT'
-                  ? `Invoice ${op.payload.invoice_number} (${op.payload.items?.length || 0} components)`
-                  : `${op.payload.item_sku || op.payload.sku} → Drawer ${op.payload.drawer_id} (${op.payload.quantity} units)`}
+              <div className="text-xs font-medium text-slate-600">
+                {(op.action || op.op_type) === 'RECEIVE' && (
+                  <span>
+                    SKU: <b>{op.payload.item_sku}</b> • Qty: <b>{op.payload.quantity}</b> → Drawer{' '}
+                    <b>{op.payload.drawer_id}</b>
+                  </span>
+                )}
+                {(op.action || op.op_type) === 'CONSUME' && (
+                  <span>
+                    SKU: <b>{op.payload.item_sku}</b> • Qty: <b>{op.payload.quantity}</b> (from{' '}
+                    <b>{op.payload.drawer_id}</b>)
+                  </span>
+                )}
+                {(op.action || op.op_type) === 'INVOICE_COMMIT' && (
+                  <span>
+                    Invoice #{' '}
+                    <b>{op.payload.invoice_number}</b> •{' '}
+                    <b>{op.payload.items?.length || 0} component(s)</b>
+                  </span>
+                )}
               </div>
 
-              <div className="flex items-center justify-between text-[10px] text-[#71717A] font-mono pt-1 border-t border-[#F4F4F5]">
-                <span>UUID: {op.client_op_id.slice(0, 12)}...</span>
-                <span className="font-bold text-[#D97706] bg-[#FEF3C7] px-1.5 py-0.5 rounded">
-                  {op.status}
+              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-100">
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {new Date(op.timestamp || op.created_at || Date.now()).toLocaleTimeString()}
                 </span>
+                <span title={op.client_op_id}>UUID: {op.client_op_id.slice(0, 8)}...</span>
               </div>
             </div>
           ))
-        ) : (
-          <div className="p-8 bg-white border-2 border-dashed border-[#D4D4D8] rounded-2xl text-center space-y-2">
-            <CheckCircle2 className="w-8 h-8 text-[#15803D] mx-auto" />
-            <h4 className="text-xs font-black text-[#18181B] uppercase">All Operations Synchronized</h4>
-            <p className="text-[11px] text-[#71717A]">
-              Your phone cache has no pending transactions. All stock movements have been acknowledged by the Windows master database.
-            </p>
-          </div>
         )}
       </div>
     </div>

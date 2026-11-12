@@ -51,6 +51,9 @@ export interface ItemResponse {
   unit_cost: number;
   datasheet_url?: string;
   total_available: number;
+  total_quantity?: number;
+  reorder_point?: number;
+  unit_price?: number;
   is_low_stock: boolean;
   last_order_date?: string | null;
   last_delivery_time?: string | null;
@@ -69,6 +72,7 @@ export interface StockReceivePayload {
   supplier?: string;
   invoice_number?: string;
   drawer_id: string;
+  target_drawer_id?: string;
   sub_tray?: string;
   order_date?: string | null;
   delivery_arrival_time?: string | null;
@@ -78,20 +82,28 @@ export interface StockReceivePayload {
 export interface StockConsumePayload {
   client_op_id?: string;
   sku?: string;
+  item_sku?: string;
   item_id?: number;
   drawer_id: string;
   quantity: number;
   project_name?: string;
   requester?: string;
+  user_name?: string;
+  reason?: string;
   notes?: string;
 }
 
 export interface StockTransferPayload {
   client_op_id?: string;
   sku?: string;
+  item_sku?: string;
   item_id?: number;
   from_drawer_id: string;
   to_drawer_id: string;
+  source_drawer_id?: string;
+  target_drawer_id?: string;
+  user_name?: string;
+  reason?: string;
   quantity: number;
   notes?: string;
 }
@@ -113,6 +125,7 @@ export interface TransactionResponse {
   drawer_id?: string;
   action_type: 'RECEIVE' | 'CONSUME' | 'TRANSFER' | 'AUDIT_ADJUST';
   change_qty: number;
+  quantity_change?: number;
   balance_after: number;
   reference_doc?: string;
   notes?: string;
@@ -275,4 +288,22 @@ export interface InvoiceSummaryResponse {
   total_units: number;
   drawers_used: string[];
   items: InvoiceItemDetail[];
+}
+
+export interface NetworkInterface {
+  name: string;
+  ip: string;
+  is_primary: boolean;
+}
+
+export interface NetworkInfo {
+  primary_ip: string;
+  primary_interface_name: string;
+  interfaces: NetworkInterface[];
+  http_port: number;
+  https_port: number;
+  primary_https_url: string;
+  primary_http_url: string;
+  localhost_http_url: string;
+  localhost_https_url: string;
 }

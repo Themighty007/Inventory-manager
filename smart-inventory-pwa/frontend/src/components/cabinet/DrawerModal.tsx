@@ -1,7 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DrawerDetail } from '../../types/inventory';
-import { fetchDrawerDetail, consumeStock, transferStock, fetchQrCode } from '../../api/client';
-import { X, Plus, Minus, ArrowRightLeft, QrCode, ShieldCheck, AlertCircle } from 'lucide-react';
+import {
+  fetchDrawerDetail,
+  consumeStock,
+  transferStock,
+  fetchQrCode,
+} from '../../api/client';
+import {
+  X,
+  Plus,
+  Minus,
+  ArrowRightLeft,
+  QrCode,
+  ShieldCheck,
+  AlertCircle,
+  Package,
+} from 'lucide-react';
 
 interface DrawerModalProps {
   drawerId: string | null;
@@ -21,72 +35,72 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
   onPrintQrForDrawer,
 }) => {
   const [detail, setDetail] = useState<DrawerDetail | null>(null);
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'CONTENTS' | 'REMOVE' | 'TRANSFER' | 'QR'>('CONTENTS');
 
-  // Quick Remove state
+  // Action Form States
   const [removeSku, setRemoveSku] = useState('');
   const [removeQty, setRemoveQty] = useState(1);
   const [reason, setReason] = useState('');
 
-  // Transfer state
   const [transferSku, setTransferSku] = useState('');
-  const [targetDrawer, setTargetDrawer] = useState('S01');
   const [transferQty, setTransferQty] = useState(1);
+  const [targetDrawer, setTargetDrawer] = useState('');
 
-  // Status/Error
+  const [qrDataUri, setQrDataUri] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [qrDataUri, setQrDataUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (drawerId) {
-      loadDrawer(drawerId);
-      setQrDataUri(null);
+      loadDrawerDetail(drawerId);
+      loadDrawerQr(drawerId);
+      setActiveTab('CONTENTS');
+      setActionError(null);
+      setActionSuccess(null);
     }
   }, [drawerId]);
 
-  useEffect(() => {
-    if (drawerId && activeTab === 'QR' && !qrDataUri) {
-      fetchQrCode(`DRAWER:${drawerId}`)
-        .then((res) => setQrDataUri(res.data_uri))
-        .catch((err) => console.warn('Failed to load QR:', err));
-    }
-  }, [drawerId, activeTab, qrDataUri]);
-
-  const loadDrawer = async (id: string) => {
+  const loadDrawerDetail = async (id: string) => {
     try {
-      setLoading(true);
-      setActionError(null);
-      setActionSuccess(null);
-      const res = await fetchDrawerDetail(id);
-      setDetail(res);
-      if (res.items.length > 0) {
-        setRemoveSku(res.items[0].sku);
-        setTransferSku(res.items[0].sku);
+      const data = await fetchDrawerDetail(id);
+      setDetail(data);
+      if (data.items.length > 0) {
+        setRemoveSku(data.items[0].sku);
+        setTransferSku(data.items[0].sku);
       }
     } catch (err: any) {
       setActionError(err.message);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const loadDrawerQr = async (id: string) => {
+    try {
+      const res = await fetchQrCode(`DRAWER:${id}`);
+      setQrDataUri(res.data_uri);
+    } catch (err) {
+      console.warn('Failed to load QR code for drawer:', err);
     }
   };
 
   const handleRemoveStock = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!drawerId || !removeSku) return;
+    setActionError(null);
+    setActionSuccess(null);
+
     try {
-      setActionError(null);
-      const res = await consumeStock({
-        drawer_id: drawerId,
+      await consumeStock({
         sku: removeSku,
+        item_sku: removeSku,
         quantity: removeQty,
-        requester: userName || 'User',
-        project_name: reason || 'Part Consumed / Used',
+        drawer_id: drawerId,
+        requester: userName,
+        user_name: userName,
+        notes: reason || 'Lab Consumption',
       });
-      setActionSuccess(res.message);
-      loadDrawer(drawerId);
+      setActionSuccess(`Successfully deducted ${removeQty} units from ${drawerId}`);
       onRefresh();
+      loadDrawerDetail(drawerId);
       setTimeout(() => setActiveTab('CONTENTS'), 1200);
     } catch (err: any) {
       setActionError(err.message);
@@ -95,18 +109,24 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
 
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!drawerId || !transferSku) return;
+    if (!drawerId || !transferSku || !targetDrawer) return;
+    setActionError(null);
+    setActionSuccess(null);
+
     try {
-      setActionError(null);
-      const res = await transferStock({
-        from_drawer_id: drawerId,
-        to_drawer_id: targetDrawer,
+      await transferStock({
         sku: transferSku,
+        item_sku: transferSku,
         quantity: transferQty,
+        from_drawer_id: drawerId,
+        source_drawer_id: drawerId,
+        to_drawer_id: targetDrawer.toUpperCase().trim(),
+        target_drawer_id: targetDrawer.toUpperCase().trim(),
+        notes: 'Compartment Reallocation',
       });
-      setActionSuccess(res.message);
-      loadDrawer(drawerId);
+      setActionSuccess(`Successfully moved ${transferQty} units from ${drawerId} to ${targetDrawer}`);
       onRefresh();
+      loadDrawerDetail(drawerId);
       setTimeout(() => setActiveTab('CONTENTS'), 1200);
     } catch (err: any) {
       setActionError(err.message);
@@ -118,26 +138,26 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="brutal-card bg-white w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto"
+        className="skr-card bg-white w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b-2 border-[#18181B] mb-5">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-5">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-[#18181B] text-white flex flex-col items-center justify-center font-mono font-black border-2 border-[#18181B] shadow-[2px_2px_0px_#18181B]">
-              <span className="text-base">{drawerId}</span>
-              <span className="text-[9px] text-[#A1A1AA] uppercase">
+            <div className="w-12 h-12 rounded-xl bg-[#0B132B] text-white flex flex-col items-center justify-center font-mono font-bold border border-slate-800 shadow-sm">
+              <span className="text-base text-[#00B4D8]">{drawerId}</span>
+              <span className="text-[9px] text-slate-400 uppercase font-sans">
                 {detail?.drawer_type === 'SMALL' ? 'Small' : 'Large'}
               </span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-black text-[#18181B]">Compartment {drawerId}</h2>
-                <span className={`brutal-pill ${detail?.is_occupied ? 'pill-mint' : 'pill-yellow'}`}>
+                <h2 className="text-lg font-display font-bold text-[#0B132B]">Compartment {drawerId}</h2>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${detail?.is_occupied ? 'bg-[#2EC4B6]/15 text-[#0E7490]' : 'bg-slate-100 text-slate-600'}`}>
                   {detail?.is_occupied ? 'Available' : 'Empty'}
                 </span>
               </div>
-              <p className="text-xs text-[#71717A] font-mono mt-0.5">
+              <p className="text-xs text-slate-500 font-mono mt-0.5">
                 {detail?.section === 'UPPER' ? 'Upper Section (Row ' + detail?.row_idx + ', Col ' + detail?.col_idx + ')' : 'Lower Section (Row ' + detail?.row_idx + ', Col ' + detail?.col_idx + ')'} • {detail?.dimensions}
               </p>
             </div>
@@ -146,22 +166,22 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={() => onPrintQrForDrawer(drawerId)}
-              className="p-1.5 rounded-lg border-2 border-[#18181B] hover:bg-[#F4F4F5] text-[#18181B]"
+              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-all"
               title="Print QR Sticker"
             >
               <QrCode className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg border-2 border-[#18181B] flex items-center justify-center hover:bg-[#F4F4F5]"
+              className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-100 text-slate-500 transition-all"
             >
-              <X className="w-4 h-4 text-[#18181B]" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 mb-4 border-b border-[#E4E4E7] pb-2 text-xs">
+        <div className="flex items-center gap-2 mb-4 border-b border-slate-200 pb-2 text-xs">
           {(['CONTENTS', 'REMOVE', 'TRANSFER', 'QR'] as const).map((tab) => (
             <button
               key={tab}
@@ -170,10 +190,10 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
                 setActionError(null);
                 setActionSuccess(null);
               }}
-              className={`px-3 py-1.5 font-bold rounded-lg border-2 border-[#18181B] transition-all ${
+              className={`px-3 py-1.5 font-semibold rounded-lg transition-all ${
                 activeTab === tab
-                  ? 'bg-[#18181B] text-white shadow-[2px_2px_0px_#18181B]'
-                  : 'bg-white text-[#18181B] hover:bg-[#F4F4F5]'
+                  ? 'bg-[#0B132B] text-[#00B4D8] border border-[#00B4D8]/30 shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
               }`}
             >
               {tab === 'CONTENTS' && 'Contents & Available'}
@@ -186,13 +206,13 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
 
         {/* Alerts */}
         {actionError && (
-          <div className="mb-4 p-3 bg-[#FEE2E2] border-2 border-[#B91C1C] rounded-xl text-xs font-bold text-[#B91C1C] flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" /> {actionError}
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" /> {actionError}
           </div>
         )}
         {actionSuccess && (
-          <div className="mb-4 p-3 bg-[#DCFCE7] border-2 border-[#15803D] rounded-xl text-xs font-bold text-[#15803D] flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4" /> {actionSuccess}
+          <div className="mb-4 p-3 bg-[#2EC4B6]/15 border border-[#2EC4B6]/30 rounded-xl text-xs font-semibold text-[#0E7490] flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 shrink-0" /> {actionSuccess}
           </div>
         )}
 
@@ -204,38 +224,38 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
                 {detail.items.map((it) => (
                   <div
                     key={it.sku}
-                    className="p-4 rounded-xl border-2 border-[#18181B] bg-[#FAFAFA] flex items-center justify-between shadow-[2px_2px_0px_#18181B]"
+                    className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between"
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono font-black text-sm text-[#18181B]">
+                        <span className="font-mono font-bold text-sm text-[#0B132B]">
                           {it.sku}
                         </span>
-                        <span className="text-[10px] uppercase font-bold text-[#71717A] bg-white px-2 py-0.5 rounded border border-[#E4E4E7]">
+                        <span className="text-[10px] uppercase font-bold text-[#00B4D8] bg-white px-2 py-0.5 rounded border border-slate-200">
                           {it.category}
                         </span>
                       </div>
-                      <div className="text-xs font-semibold text-[#18181B] mt-1">
+                      <div className="text-xs font-semibold text-[#1E293B] mt-1">
                         {it.name}
                       </div>
-                      <div className="text-[11px] text-[#71717A] font-mono mt-0.5">
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
                         Tray: {it.sub_tray} • Unit Cost: ₹{it.unit_cost.toLocaleString('en-IN')}
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <div className="text-[10px] font-black uppercase text-[#71717A]">
+                      <div className="text-[10px] font-bold uppercase text-slate-400">
                         Available
                       </div>
-                      <div className="text-xl font-black font-mono text-[#15803D]">
-                        {it.quantity} <span className="text-xs font-sans text-[#71717A]">{it.unit}</span>
+                      <div className="text-xl font-bold font-mono text-[#2EC4B6]">
+                        {it.quantity} <span className="text-xs font-sans text-slate-500">{it.unit}</span>
                       </div>
                       <button
                         onClick={() => {
                           setRemoveSku(it.sku);
                           setActiveTab('REMOVE');
                         }}
-                        className="mt-2 text-xs font-bold px-2.5 py-1 rounded-lg border border-[#18181B] bg-[#FCA5A5] hover:bg-[#F87171] text-[#7F1D1D] shadow-[1px_1px_0px_#18181B]"
+                        className="mt-2 text-xs font-semibold px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 transition-all"
                       >
                         Remove
                       </button>
@@ -244,7 +264,7 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="py-8 text-center text-xs text-[#71717A] font-semibold border-2 border-dashed border-[#D4D4D8] rounded-xl">
+              <div className="py-8 text-center text-xs text-slate-500 font-medium border border-dashed border-slate-300 rounded-xl">
                 This compartment is currently empty.
               </div>
             )}
@@ -255,9 +275,9 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
                   onClose();
                   onOpenReceiveForDrawer(drawerId);
                 }}
-                className="w-full brutal-btn brutal-btn-mint text-xs py-2.5"
+                className="w-full btn-cyan text-xs py-2.5 font-semibold rounded-xl flex items-center justify-center gap-2"
               >
-                <Plus className="w-4 h-4" /> + Put Item In Compartment {drawerId}
+                <Plus className="w-4 h-4" /> Add Item To Compartment {drawerId}
               </button>
             </div>
           </div>
@@ -267,13 +287,13 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
         {activeTab === 'REMOVE' && (
           <form onSubmit={handleRemoveStock} className="space-y-4">
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">
-                SELECT COMPONENT TO DEDUCT *
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">
+                Select Component To Deduct *
               </label>
               <select
                 value={removeSku}
                 onChange={(e) => setRemoveSku(e.target.value)}
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-bold bg-[#FAFAFA]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-semibold bg-slate-50 focus:border-[#00B4D8]"
                 required
               >
                 {detail?.items.map((it) => (
@@ -286,47 +306,47 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-black text-[#18181B] mb-1">
-                  QUANTITY TO REMOVE *
+                <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">
+                  Quantity To Remove *
                 </label>
                 <input
                   type="number"
                   min={1}
                   value={removeQty}
                   onChange={(e) => setRemoveQty(parseInt(e.target.value) || 1)}
-                  className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-black bg-[#FAFAFA]"
+                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white focus:border-[#00B4D8]"
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-black text-[#18181B] mb-1">
-                  AUTHORIZED USER
+                <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">
+                  Authorized Signature
                 </label>
                 <input
                   type="text"
                   value={userName}
                   disabled
-                  className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-bold bg-[#F4F4F5]"
+                  className="w-full p-2.5 rounded-lg border border-slate-200 text-xs font-semibold bg-slate-100 text-slate-600"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">
-                REASON / PROJECT / WORK ORDER
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">
+                Reason / Project / Work Order
               </label>
               <input
                 type="text"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. IoT Sensor Assembly Lab / Hall Repair"
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-semibold bg-[#FAFAFA]"
+                placeholder="e.g. PCB Prototype Assembly"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-medium bg-white focus:border-[#00B4D8]"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full brutal-btn brutal-btn-coral text-xs py-2.5 mt-2"
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-all flex items-center justify-center gap-2 mt-2"
             >
               <Minus className="w-4 h-4" /> Confirm Stock Removal
             </button>
@@ -337,13 +357,13 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
         {activeTab === 'TRANSFER' && (
           <form onSubmit={handleTransfer} className="space-y-4">
             <div>
-              <label className="block text-xs font-black text-[#18181B] mb-1">
-                SELECT COMPONENT TO MOVE *
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">
+                Select Component To Move *
               </label>
               <select
                 value={transferSku}
                 onChange={(e) => setTransferSku(e.target.value)}
-                className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-bold bg-[#FAFAFA]"
+                className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-semibold bg-slate-50 focus:border-[#00B4D8]"
                 required
               >
                 {detail?.items.map((it) => (
@@ -356,28 +376,28 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-black text-[#18181B] mb-1">
-                  TARGET DRAWER *
+                <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">
+                  Target Drawer *
                 </label>
                 <input
                   type="text"
                   value={targetDrawer}
                   onChange={(e) => setTargetDrawer(e.target.value.toUpperCase())}
                   placeholder="e.g. S12 or L02"
-                  className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-black bg-[#FAFAFA]"
+                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white focus:border-[#00B4D8]"
                   required
                 />
               </div>
               <div>
-                <label className="block text-xs font-black text-[#18181B] mb-1">
-                  QUANTITY *
+                <label className="block text-xs font-bold text-slate-700 mb-1 uppercase">
+                  Quantity *
                 </label>
                 <input
                   type="number"
                   min={1}
                   value={transferQty}
                   onChange={(e) => setTransferQty(parseInt(e.target.value) || 1)}
-                  className="w-full p-2.5 rounded-lg border-2 border-[#18181B] text-xs font-mono font-black bg-[#FAFAFA]"
+                  className="w-full p-2.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white focus:border-[#00B4D8]"
                   required
                 />
               </div>
@@ -385,7 +405,7 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
 
             <button
               type="submit"
-              className="w-full brutal-btn brutal-btn-yellow text-xs py-2.5 mt-2"
+              className="w-full btn-teal text-xs py-2.5 font-semibold rounded-xl flex items-center justify-center gap-2 mt-2"
             >
               <ArrowRightLeft className="w-4 h-4" /> Move Stock to Compartment {targetDrawer}
             </button>
@@ -395,8 +415,8 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
         {/* TAB 4: QR CODE */}
         {activeTab === 'QR' && (
           <div className="flex flex-col items-center justify-center p-6 space-y-4 text-center">
-            <div className="p-4 bg-white border-4 border-[#18181B] rounded-2xl shadow-[4px_4px_0px_#18181B]">
-              <div className="w-52 h-52 flex items-center justify-center bg-white border-2 border-[#18181B] rounded-xl p-2">
+            <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <div className="w-52 h-52 flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl p-2">
                 {qrDataUri ? (
                   <img
                     src={qrDataUri}
@@ -404,7 +424,7 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
                     className="w-full h-full object-contain"
                   />
                 ) : (
-                  <div className="text-xs font-mono font-bold text-[#71717A] animate-pulse">
+                  <div className="text-xs font-mono font-bold text-slate-400 animate-pulse">
                     Generating live QR code...
                   </div>
                 )}
@@ -412,17 +432,17 @@ export const DrawerModal: React.FC<DrawerModalProps> = ({
             </div>
 
             <div>
-              <div className="font-mono font-black text-lg text-[#18181B] tracking-wide">
+              <div className="font-mono font-bold text-lg text-[#0B132B] tracking-wide">
                 DRAWER:{drawerId}
               </div>
-              <div className="text-xs text-[#71717A] font-semibold mt-0.5">
+              <div className="text-xs text-slate-500 font-medium mt-0.5">
                 Scan with phone camera to open or stock this compartment
               </div>
             </div>
 
             <button
               onClick={() => onPrintQrForDrawer(drawerId)}
-              className="brutal-btn brutal-btn-yellow text-xs py-2 px-6"
+              className="btn-cyan text-xs py-2 px-6 font-semibold rounded-lg flex items-center gap-2"
             >
               <QrCode className="w-4 h-4" /> Print Compartment QR Sticker
             </button>
