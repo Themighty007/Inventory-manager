@@ -33,13 +33,15 @@ Designed with a sleek, minimalist hardware engineering aesthetic:
 - **Windows Desktop Experience**:
   - Full interactive **Stanley 1-93-981 39-Compartment Matrix** visualizer (`S01–S30` small drawers and `L01–L09` large drawers).
   - Clean unified search bar (`Search SKU, invoice, or drawer...`) and category filters (`Microcontrollers`, `Semiconductors`, `Passives`, `Sensors`, `Cables & Connectors`, etc.).
-  - **Invoice Document Auto-Logger**: Upload supplier invoices (`.pdf`, `.docx`, `.csv`, `.tsv`, `.txt`, `.json`) to automatically extract item **Name**, **SKU**, **Quantity**, **Order Date**, and **Delivery / Arrival Time**. Confirm quantities, assign each component to its Stanley drawer, and commit atomically.
+  - **Invoice Document Auto-Logger**: Upload supplier invoices (`.pdf`, `.docx`, `.csv`, `.tsv`, `.txt`, `.json`) to automatically extract item **Name**, **SKU**, **Quantity**, **Order Date**, and **Delivery / Arrival Time**. Extracted items are staged directly into the **"Yet to be Delivered"** box without forcing compartment assignments upfront.
+  - **"Yet to be Delivered" In-Transit Hub**: Dedicated management space displaying incoming electronic components, expected arrivals, and in-transit valuation. When parcels arrive, assign physical Stanley drawers (`S01–S30` or `L01–L09`) via the visual matrix modal or mobile scanner.
   - **Dynamic Network Discovery**: Seamless dropdown selector for multiple Wi-Fi/Ethernet adapters, custom IP input, and live QR code generation.
   - **Logged Invoices & Arrivals** audit panel and **Permanent Transaction Ledger**.
   - Printable 39-compartment QR label sheet modal for drawer stickers.
 - **Android Mobile Experience**:
   - High-precision in-browser QR & all-format 1D/2D barcode camera scanner (hardware `BarcodeDetector` + `jsQR` engine supporting QR, Code 128, Code 39, Code 93, Codabar, ITF, EAN-13, EAN-8, UPC-A, UPC-E, PDF417, Aztec, Data Matrix with tap-to-focus, center-crop sensor precision, rear camera selection, flash/torch toggle, photo upload fallback, and manual entry).
-  - **Mobile Invoice Tab**: Upload downloaded PDF/DOCX/CSV invoices directly from your phone, confirm quantities, tap Stanley compartments (`S01–L09`), and commit to the master database.
+  - **Hardware Arrival Auto-Match**: Scanning an in-transit SKU or barcode automatically detects the pending invoice order and pre-fills details, requiring only a single tap on the Stanley compartment.
+  - **Mobile Invoice Tab**: Upload downloaded PDF/DOCX/CSV invoices directly from your phone to stage them into "Yet to be Delivered".
   - Touch-friendly 39-drawer grid with drawer detail bottom sheet, quantity stepper, and quick deduction.
   - Full **PWA Installation**: Install directly from Chrome to your phone's home screen without needing an APK.
 
